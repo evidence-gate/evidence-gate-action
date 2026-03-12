@@ -1,0 +1,41 @@
+name: Update Major Release Tag
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  update-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version and update floating major tag
+        run: |
+          # Extract version from tag (e.g., v1.2.3)
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "Release version: $VERSION"
+
+          # Validate semver format
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::warning::Tag '$VERSION' is not a semver tag (vX.Y.Z). Skipping floating tag update."
+            exit 0
+          fi
+
+          # Parse major version (e.g., v1)
+          MAJOR=$(echo "$VERSION" | grep -oE '^v[0-9]+')
+          echo "Major version: $MAJOR"
+
+          # Configure git
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # Force-push the floating major tag
+          git tag -fa "${MAJOR}" -m "Update ${MAJOR} tag to ${VERSION}"
+          git push origin "${MAJOR}" --force
+
+          echo "Updated ${MAJOR} -> ${VERSION}"
