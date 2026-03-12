@@ -184,9 +184,9 @@ The action uses **fail-closed** semantics: any unhandled error causes the step t
 
 ## Links
 
-- [Pro Plan & Pricing](https://evidence-gate.com/pricing)
-- [Self-hosted Deployment Guide](https://docs.evidence-gate.com/self-hosted)
-- [Documentation](https://docs.evidence-gate.com)
+- [Pro Plan & Pricing](https://evidence-gate.com#pricing)
+- [Self-hosted Deployment Guide](https://evidence-gate.com#pricing)
+- [Documentation](https://evidence-gate.com)
 - [Changelog](CHANGELOG.md)
 
 ## License

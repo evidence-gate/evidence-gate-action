@@ -32,7 +32,7 @@ PRO_ONLY_GATE_TYPES = frozenset({
     "wave",
 })
 
-PRICING_URL = "https://evidence-gate.com/pricing"
+PRICING_URL = "https://evidence-gate.com#pricing"
 
 
 # ---------------------------------------------------------------------------
