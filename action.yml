@@ -1,0 +1,89 @@
+name: "Evidence Gate"
+description: >-
+  Run quality gates in your CI/CD pipeline. Verify evidence files, enforce
+  thresholds, and integrate with Evidence Gate SaaS for Blind Gate evaluation,
+  Quality State tracking, and remediation workflows.
+author: "evidence-gate"
+
+branding:
+  icon: shield
+  color: green
+
+inputs:
+  api_key:
+    description: >-
+      Evidence Gate API key. Optional — omit for Free mode (client-side
+      evaluation only). Required for Pro/Enterprise features (Blind Gate,
+      Quality State, Remediation).
+    required: false
+    default: ""
+  gate_type:
+    description: "Gate type to evaluate (e.g., skill, xac, security)"
+    required: true
+  phase_id:
+    description: "Phase ID (e.g., 1a, 2b)"
+    required: true
+  evidence_files:
+    description: "Comma-separated list of evidence file paths"
+    required: false
+    default: ""
+  api_base:
+    description: "Evidence Gate API base URL (change for Self-hosted Enterprise)"
+    required: false
+    default: "https://api.evidence-gate.com"
+  dashboard_base_url:
+    description: "Supplemental dashboard base URL for run/evidence deep links"
+    required: false
+    default: ""
+  evidence_url:
+    description: "Explicit evidence deep link URL"
+    required: false
+    default: ""
+
+outputs:
+  passed:
+    description: "Gate result (true/false)"
+    value: ${{ steps.evidence_gate.outputs.passed }}
+  run_id:
+    description: "Pipeline run ID"
+    value: ${{ steps.evidence_gate.outputs.run_id }}
+  trace_url:
+    description: "Langfuse trace URL"
+    value: ${{ steps.evidence_gate.outputs.trace_url }}
+  evidence_url:
+    description: "Evidence detail URL"
+    value: ${{ steps.evidence_gate.outputs.evidence_url }}
+  dashboard_url:
+    description: "Supplemental dashboard URL"
+    value: ${{ steps.evidence_gate.outputs.dashboard_url }}
+  github_run_url:
+    description: "GitHub Actions run URL"
+    value: ${{ steps.evidence_gate.outputs.github_run_url }}
+  major_issue_count:
+    description: "Number of detected issues"
+    value: ${{ steps.evidence_gate.outputs.major_issue_count }}
+  mode:
+    description: "Detected operational mode: free, pro, or enterprise"
+    value: ${{ steps.evidence_gate.outputs.mode }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Run Evidence Gate
+      id: evidence_gate
+      shell: bash
+      env:
+        EG_API_KEY: ${{ inputs.api_key }}
+        EG_API_BASE: ${{ inputs.api_base }}
+        EG_GATE_TYPE: ${{ inputs.gate_type }}
+        EG_PHASE_ID: ${{ inputs.phase_id }}
+        EG_EVIDENCE_FILES: ${{ inputs.evidence_files }}
+        EG_DASHBOARD_BASE_URL: ${{ inputs.dashboard_base_url }}
+        EG_EVIDENCE_URL: ${{ inputs.evidence_url }}
+        EG_RUN_ID: ${{ github.run_id }}
+      run: python ${{ github.action_path }}/src/entrypoint.py
