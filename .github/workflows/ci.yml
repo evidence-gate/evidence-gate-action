@@ -1,0 +1,83 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint check
+        run: ruff check src/ tests/
+
+      - name: Format check
+        run: ruff format --check src/ tests/
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pytest pyyaml
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check core.py drift
+        run: |
+          # Extract CORE_SHA256 constant from src/core.py
+          EXPECTED=$(python3 -c "
+          import re, sys
+          with open('src/core.py') as f:
+              content = f.read()
+          # Find the last assignment to CORE_SHA256 (the computed one)
+          # The module computes it at import time via _compute_core_sha256()
+          # We replicate that logic here without importing
+          with open('src/core.py', 'rb') as f:
+              lines = f.readlines()
+          canonical = b''.join(
+              line for line in lines
+              if not line.strip().startswith(b'CORE_VERSION')
+              and not line.strip().startswith(b'CORE_SHA256')
+          )
+          import hashlib
+          print(hashlib.sha256(canonical).hexdigest())
+          ")
+
+          STORED=$(python3 -c "
+          import sys
+          sys.path.insert(0, 'src')
+          from core import CORE_SHA256
+          print(CORE_SHA256)
+          ")
+
+          echo "Computed SHA-256: $EXPECTED"
+          echo "Stored SHA-256:   $STORED"
+
+          if [ "$EXPECTED" != "$STORED" ]; then
+            echo "::error title=Core Drift Detected::CORE_SHA256 mismatch. Expected: $EXPECTED, Got: $STORED"
+            exit 1
+          fi
+
+          echo "core.py integrity check passed"
