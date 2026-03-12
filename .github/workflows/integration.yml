@@ -1,0 +1,66 @@
+name: Integration Test
+on: [push, pull_request]
+
+jobs:
+  test-free-mode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create test evidence file
+        run: echo '{"test": true, "score": 95}' > evidence.json
+
+      - name: Run Evidence Gate (Free mode - file_check)
+        uses: ./
+        id: gate
+        with:
+          gate_type: "file_check"
+          phase_id: "test"
+          evidence_files: "evidence.json"
+
+      - name: Verify outputs
+        run: |
+          echo "passed=${{ steps.gate.outputs.passed }}"
+          echo "mode=${{ steps.gate.outputs.mode }}"
+
+          if [ "${{ steps.gate.outputs.passed }}" != "true" ]; then
+            echo "::error::Expected passed=true, got ${{ steps.gate.outputs.passed }}"
+            exit 1
+          fi
+
+          if [ "${{ steps.gate.outputs.mode }}" != "free" ]; then
+            echo "::error::Expected mode=free, got ${{ steps.gate.outputs.mode }}"
+            exit 1
+          fi
+
+          echo "Free mode file_check integration test: PASS"
+
+  test-pro-feature-upsell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create test evidence file
+        run: echo '{"test": true}' > evidence.json
+
+      - name: Run Evidence Gate (Free mode - blind_gate triggers upsell)
+        uses: ./
+        id: gate
+        with:
+          gate_type: "blind_gate"
+          phase_id: "test"
+          evidence_files: "evidence.json"
+
+      - name: Verify upsell behavior
+        run: |
+          echo "passed=${{ steps.gate.outputs.passed }}"
+          echo "mode=${{ steps.gate.outputs.mode }}"
+
+          if [ "${{ steps.gate.outputs.mode }}" != "free" ]; then
+            echo "::error::Expected mode=free, got ${{ steps.gate.outputs.mode }}"
+            exit 1
+          fi
+
+          # Action should not fail (exit 0) even for Pro-only gate type
+          # The upsell is informational, not a failure
+          echo "Pro feature upsell integration test: PASS"
