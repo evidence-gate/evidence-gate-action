@@ -172,13 +172,13 @@ def _validate_node(
     # Type check
     expected_type = schema.get("type")
     if expected_type:
+        # Special case: bool is a subclass of int in Python, but
+        # "number" should not accept booleans
+        if expected_type == "number" and isinstance(data, bool):
+            issues.append(f"{path}: expected {expected_type}, got boolean")
+            return
         py_type = _TYPE_MAP.get(expected_type)
         if py_type and not isinstance(data, py_type):
-            # Special case: bool is a subclass of int in Python, but
-            # "number" should not accept booleans
-            if expected_type == "number" and isinstance(data, bool):
-                issues.append(f"{path}: expected {expected_type}, got boolean")
-                return
             issues.append(f"{path}: expected {expected_type}, got {type(data).__name__}")
             return
 
