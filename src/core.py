@@ -33,7 +33,7 @@ class EvidenceGateError(Exception):
 # Configuration
 # ---------------------------------------------------------------------------
 
-DEFAULT_API_BASE = "https://api.evidence-gate.com"
+DEFAULT_API_BASE = "https://api.evidence-gate.dev"
 DEFAULT_TIMEOUT = 30  # seconds
 
 

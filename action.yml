@@ -27,7 +27,7 @@ inputs:
   api_base:
     description: "Evidence Gate API base URL (change for Self-hosted Enterprise)"
     required: false
-    default: "https://api.evidence-gate.com"
+    default: "https://api.evidence-gate.dev"
   dashboard_base_url:
     description: "Supplemental dashboard base URL for run/evidence deep links"
     required: false

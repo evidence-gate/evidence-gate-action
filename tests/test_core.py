@@ -71,7 +71,7 @@ class TestRequestFormat:
         call_args = mock_urlopen.call_args
         req = call_args[0][0]
         assert req.method == "POST"
-        assert req.full_url == "https://api.test.evidence-gate.com/v1/evaluate"
+        assert req.full_url == "https://api.test.evidence-gate.dev/v1/evaluate"
 
     @patch("core.urlopen")
     def test_evaluate_sends_bearer_auth(self, mock_urlopen: MagicMock) -> None:
@@ -158,7 +158,7 @@ class TestRequestFormat:
         )
 
         req = mock_urlopen.call_args[0][0]
-        assert req.full_url == "https://api.test.evidence-gate.com/v1/evaluate/batch"
+        assert req.full_url == "https://api.test.evidence-gate.dev/v1/evaluate/batch"
         body = json.loads(req.data)
         assert "evaluations" in body
         assert body["run_id"] == "batch-run"

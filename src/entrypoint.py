@@ -25,7 +25,7 @@ from local_evaluator import evaluate_local
 MAX_ANNOTATIONS = 10
 MAX_MAJOR_ISSUES = 5
 
-PRICING_URL = "https://evidence-gate.com#pricing"
+PRICING_URL = "https://evidence-gate.dev#pricing"
 
 
 def _escape_workflow_command(value: str) -> str:

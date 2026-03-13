@@ -5,7 +5,7 @@
 - [ ] All CI checks pass on `main` branch
 - [ ] README.md is up to date with correct URLs
 - [ ] CHANGELOG.md has v1.0.0 entry
-- [ ] Landing page is live at https://evidence-gate.com
+- [ ] Landing page is live at https://evidence-gate.dev
 - [ ] `action.yml` branding is set (icon=shield, color=green)
 
 ## Release Steps

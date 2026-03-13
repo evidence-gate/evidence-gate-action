@@ -18,7 +18,7 @@ def _set_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     Individual tests can override or delete this as needed.
     """
     monkeypatch.setenv("EG_API_KEY", "eg_test_contract_key")
-    monkeypatch.setenv("EG_API_BASE", "https://api.test.evidence-gate.com")
+    monkeypatch.setenv("EG_API_BASE", "https://api.test.evidence-gate.dev")
 
 
 def make_mock_response(
@@ -43,7 +43,7 @@ def make_http_error(
     from io import BytesIO
 
     err = HTTPError(
-        url="https://api.test.evidence-gate.com/v1/evaluate",
+        url="https://api.test.evidence-gate.dev/v1/evaluate",
         code=status,
         msg=f"HTTP {status}",
         hdrs={},  # type: ignore[arg-type]

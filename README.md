@@ -39,7 +39,7 @@ Free mode requires **zero external dependencies** -- all checks run locally usin
 | `phase_id` | **Yes** | -- | Phase identifier (e.g., `build`, `test`, `deploy`, `1a`, `2b`) |
 | `evidence_files` | No | `""` | Comma-separated list of evidence file paths to validate |
 | `api_key` | No | `""` | Evidence Gate API key. Omit for Free mode. Required for Pro/Enterprise features |
-| `api_base` | No | `https://api.evidence-gate.com` | API base URL. Change for self-hosted Enterprise deployments |
+| `api_base` | No | `https://api.evidence-gate.dev` | API base URL. Change for self-hosted Enterprise deployments |
 | `dashboard_base_url` | No | `""` | Dashboard base URL for run/evidence deep links |
 | `evidence_url` | No | `""` | Explicit evidence deep link URL |
 
@@ -178,15 +178,15 @@ If the action fails with a network or API error:
 
 1. **Check your API key**: Ensure `EVIDENCE_GATE_API_KEY` is set in repository secrets.
 2. **Verify the API base URL**: For Enterprise, confirm `api_base` points to your server and is reachable from GitHub Actions runners.
-3. **Check service status**: Visit [status.evidence-gate.com](https://status.evidence-gate.com) for SaaS availability.
+3. **Check service status**: Visit [status.evidence-gate.dev](https://status.evidence-gate.dev) for SaaS availability.
 
 The action uses **fail-closed** semantics: any unhandled error causes the step to exit non-zero. This prevents false passes when the evaluation service is unreachable.
 
 ## Links
 
-- [Pro Plan & Pricing](https://evidence-gate.com#pricing)
-- [Self-hosted Deployment Guide](https://evidence-gate.com#pricing)
-- [Documentation](https://evidence-gate.com)
+- [Pro Plan & Pricing](https://evidence-gate.dev#pricing)
+- [Self-hosted Deployment Guide](https://evidence-gate.dev#pricing)
+- [Documentation](https://evidence-gate.dev)
 - [Changelog](CHANGELOG.md)
 
 ## License
