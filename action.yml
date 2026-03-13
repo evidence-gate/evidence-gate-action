@@ -1,8 +1,5 @@
-name: "Evidence Gate"
-description: >-
-  Run quality gates in your CI/CD pipeline. Verify evidence files, enforce
-  thresholds, and integrate with Evidence Gate SaaS for Blind Gate evaluation,
-  Quality State tracking, and remediation workflows.
+name: "Evidence Gate Action"
+description: "Run quality gates in your CI/CD pipeline. Verify evidence, enforce thresholds, and track quality state."
 author: "evidence-gate"
 
 branding:
