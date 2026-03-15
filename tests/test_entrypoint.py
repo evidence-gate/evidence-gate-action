@@ -6,6 +6,8 @@ Verifies:
 - Free mode routing to local_evaluator (new)
 - Enterprise mode detection (new)
 - Mode output value (new)
+- Observe mode (FEAT-01)
+- json_output (FEAT-06)
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from unittest.mock import patch
 import pytest
 
 import entrypoint
+from core import EvidenceGateError, fail_closed_main
 
 
 class TestProMode:
@@ -483,3 +486,195 @@ class TestOIDCMasking:
         captured = capsys.readouterr()
         assert "::add-mask::" not in captured.out
         assert "::notice title=Evidence Gate::" not in captured.out
+
+
+class TestObserveMode:
+    """FEAT-01: Observe mode -- failures do not block the workflow step."""
+
+    def test_observe_mode_does_not_exit_on_failure(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys
+    ) -> None:
+        """EG_MODE=observe: fail_closed_main does NOT sys.exit(1) when passed=False."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "observe")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["test issue"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        # Should NOT raise SystemExit
+        fail_closed_main(entrypoint.main)
+
+        output_text = output.read_text()
+        assert "observe_would_pass=false" in output_text
+
+    def test_observe_mode_summary_badge_fail(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """EG_MODE=observe with failed result shows OBSERVE (would FAIL) badge."""
+        summary = tmp_path / "summary.md"
+        output = tmp_path / "output.txt"
+        monkeypatch.setenv("EG_MODE", "observe")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["issue1"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        fail_closed_main(entrypoint.main)
+
+        summary_text = summary.read_text()
+        assert "OBSERVE (would FAIL)" in summary_text
+
+    def test_observe_mode_summary_badge_pass(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """EG_MODE=observe with passing result shows OBSERVE (PASS) badge."""
+        summary = tmp_path / "summary.md"
+        output = tmp_path / "output.txt"
+        monkeypatch.setenv("EG_MODE", "observe")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": True, "issues": [], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        fail_closed_main(entrypoint.main)
+
+        summary_text = summary.read_text()
+        assert "OBSERVE (PASS)" in summary_text
+
+    def test_observe_mode_annotations_use_notice(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys
+    ) -> None:
+        """EG_MODE=observe: annotations emit at notice level, not error."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "observe")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["issue A", "issue B"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        fail_closed_main(entrypoint.main)
+
+        captured = capsys.readouterr()
+        # Annotations should use ::notice, not ::error
+        assert "::notice title=Evidence Gate::issue A" in captured.out
+        assert "::error" not in captured.out
+
+    def test_observe_mode_notice_emitted(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys
+    ) -> None:
+        """EG_MODE=observe emits a notice about running in observe mode."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "observe")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": True, "issues": [], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        fail_closed_main(entrypoint.main)
+
+        captured = capsys.readouterr()
+        assert "Running in observe mode" in captured.out
+
+    def test_observe_mode_suppresses_evidence_gate_error(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys
+    ) -> None:
+        """EG_MODE=observe: EvidenceGateError does NOT sys.exit(1)."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "observe")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _raise_eg_error(**kwargs):
+            raise EvidenceGateError("API unavailable")
+
+        monkeypatch.setattr(entrypoint, "evaluate", _raise_eg_error)
+
+        # Should NOT raise SystemExit
+        fail_closed_main(entrypoint.main)
+
+        captured = capsys.readouterr()
+        assert "API unavailable" in captured.out or "API unavailable" in captured.err
+
+    def test_observe_mode_suppresses_unexpected_exception(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys
+    ) -> None:
+        """EG_MODE=observe: unexpected RuntimeError does NOT sys.exit(1)."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "observe")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _raise_runtime(**kwargs):
+            raise RuntimeError("unexpected boom")
+
+        monkeypatch.setattr(entrypoint, "evaluate", _raise_runtime)
+
+        # Should NOT raise SystemExit
+        fail_closed_main(entrypoint.main)
+
+        captured = capsys.readouterr()
+        assert "RuntimeError" in captured.out or "RuntimeError" in captured.err
+
+    def test_enforce_mode_unchanged(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """Default (enforce) mode still exits on failure -- no regression."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.delenv("EG_MODE", raising=False)
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["fail"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        with pytest.raises(SystemExit) as exc_info:
+            fail_closed_main(entrypoint.main)
+        assert exc_info.value.code == 1
