@@ -91,6 +91,50 @@ def _set_multiline_output(name: str, value: str) -> None:
         f.write(f"{name}<<{delimiter}\n{value}\n{delimiter}\n")
 
 
+def _extract_missing_evidence(result: dict) -> list[dict]:
+    """Extract missing evidence items from evaluation result.
+
+    Pro/Enterprise: extracts from structured_issues where code contains "MISSING".
+    Free: extracts from plain issues containing "missing" or "not found".
+    Returns list of {code, message, field_path} dicts.
+    """
+    if result.get("passed", False):
+        return []
+
+    missing: list[dict] = []
+
+    # Try structured_issues first (Pro/Enterprise)
+    structured = result.get("structured_issues")
+    if isinstance(structured, list):
+        for item in structured:
+            if not isinstance(item, dict):
+                continue
+            code = item.get("code", "")
+            if isinstance(code, str) and "MISSING" in code.upper():
+                missing.append({
+                    "code": code,
+                    "message": item.get("message", ""),
+                    "field_path": item.get("field_path"),
+                })
+        if missing:
+            return missing
+
+    # Fallback to plain issues (Free mode)
+    issues = result.get("issues", [])
+    for issue in issues:
+        if not isinstance(issue, str):
+            continue
+        text_lower = issue.lower()
+        if "missing" in text_lower or "not found" in text_lower:
+            missing.append({
+                "code": "MISSING_EVIDENCE",
+                "message": issue,
+                "field_path": None,
+            })
+
+    return missing
+
+
 def _emit_annotations(
     issues: list[str], passed: bool, *, observe_mode: bool = False
 ) -> None:
@@ -341,6 +385,7 @@ def main() -> dict:
         _set_output("run_id", run_id)
         _set_output("github_run_url", github_run_url or "")
         _set_output("dashboard_url", dashboard_url or "")
+        _set_multiline_output("missing_evidence", json.dumps([]))
         _set_multiline_output("json_output", json.dumps(result))
         return result
 
@@ -373,6 +418,11 @@ def main() -> dict:
     _set_output("major_issue_count", str(len(issue_list)))
     if observe_mode:
         _set_output("observe_would_pass", str(passed).lower())
+
+    # Actionable outputs (FEAT-02)
+    missing = _extract_missing_evidence(result)
+    _set_multiline_output("missing_evidence", json.dumps(missing))
+
     _set_multiline_output("json_output", json.dumps(result))
 
     return result
