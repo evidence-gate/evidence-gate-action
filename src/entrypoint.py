@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import uuid
+from fnmatch import fnmatch
 from urllib.parse import urlencode
 
 from core import (
@@ -133,6 +135,90 @@ def _extract_missing_evidence(result: dict) -> list[dict]:
             })
 
     return missing
+
+
+# Recommendation table ported from SaaS remediation_recommender.
+# Tuple: (gate_pattern, issue_code_pattern, action_dict)
+# Uses fnmatch wildcards. First match wins per issue. Fallback at end.
+_RECOMMENDATION_TABLE: list[tuple[str, str, dict]] = [
+    ("security", "SECURITY_SCAN_*", {"action_id": "security-patch-vulnerabilities", "description": "Review and patch vulnerabilities in scan report", "priority": "high"}),
+    ("build", "BUILD_FAIL*", {"action_id": "build-fix-compilation", "description": "Fix compilation errors before re-evaluation", "priority": "high"}),
+    ("test_coverage", "COVERAGE_BELOW*", {"action_id": "coverage-add-tests", "description": "Add tests to improve code coverage", "priority": "medium"}),
+    ("privacy", "PRIVACY_*", {"action_id": "privacy-update-manifest", "description": "Update privacy manifest and data handling declarations", "priority": "medium"}),
+    ("*", "MISSING_EVIDENCE*", {"action_id": "missing-evidence-provide", "description": "Provide required evidence for this gate", "priority": "high"}),
+    ("*", "*", {"action_id": "generic-review-issue", "description": "Review and address the reported issue", "priority": "low"}),
+]
+
+# Keyword patterns for extracting synthetic issue codes from plain text.
+# Tuple: (regex_pattern, synthetic_issue_code)
+_KEYWORD_PATTERNS: list[tuple[str, str]] = [
+    (r"\bvulnerabilit", "SECURITY_SCAN_DETECTED"),
+    (r"\bsecurity\b", "SECURITY_SCAN_DETECTED"),
+    (r"\bcoverage\b", "COVERAGE_BELOW_THRESHOLD"),
+    (r"\bmissing\b", "MISSING_EVIDENCE_REQUIRED"),
+    (r"\bfailed\b", "BUILD_FAILURE"),
+    (r"\bcompil", "BUILD_FAILURE"),
+    (r"\btimeout\b", "BUILD_FAILURE"),
+    (r"\bprivacy\b", "PRIVACY_ISSUE"),
+]
+
+_PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def _extract_issue_code(issue_text: str) -> str:
+    """Extract synthetic issue code from plain text using keyword patterns."""
+    for pattern, code in _KEYWORD_PATTERNS:
+        if re.search(pattern, issue_text, re.IGNORECASE):
+            return code
+    return "UNKNOWN_ISSUE"
+
+
+def _match_recommendation(gate_type: str, issue_code: str) -> dict | None:
+    """Match gate_type + issue_code against recommendation table."""
+    for gate_pat, code_pat, action in _RECOMMENDATION_TABLE:
+        if fnmatch(gate_type, gate_pat) and fnmatch(issue_code, code_pat):
+            return action
+    return None
+
+
+def _generate_suggested_actions(gate_type: str, result: dict) -> list[str]:
+    """Generate human-readable repair steps from evaluation result.
+
+    Uses _RECOMMENDATION_TABLE and _KEYWORD_PATTERNS ported from SaaS.
+    Returns list of "- [priority] description" strings, sorted high > medium > low.
+    """
+    if result.get("passed", False):
+        return []
+
+    seen_action_ids: set[str] = set()
+    actions: list[tuple[int, str]] = []  # (priority_order, formatted_string)
+
+    # Collect issue codes
+    issue_codes: list[str] = []
+    structured = result.get("structured_issues")
+    if isinstance(structured, list):
+        for item in structured:
+            if isinstance(item, dict) and isinstance(item.get("code"), str):
+                issue_codes.append(item["code"])
+
+    # Fallback to plain issues
+    if not issue_codes:
+        for issue in result.get("issues", []):
+            if isinstance(issue, str):
+                issue_codes.append(_extract_issue_code(issue))
+
+    # Match and deduplicate
+    for code in issue_codes:
+        rec = _match_recommendation(gate_type, code)
+        if rec and rec["action_id"] not in seen_action_ids:
+            seen_action_ids.add(rec["action_id"])
+            priority = rec.get("priority", "low")
+            order = _PRIORITY_ORDER.get(priority, 2)
+            actions.append((order, f"- [{priority}] {rec['description']}"))
+
+    # Sort by priority (high first)
+    actions.sort(key=lambda x: x[0])
+    return [a[1] for a in actions]
 
 
 def _emit_annotations(
@@ -386,6 +472,7 @@ def main() -> dict:
         _set_output("github_run_url", github_run_url or "")
         _set_output("dashboard_url", dashboard_url or "")
         _set_multiline_output("missing_evidence", json.dumps([]))
+        _set_multiline_output("suggested_actions", "")
         _set_multiline_output("json_output", json.dumps(result))
         return result
 
@@ -419,9 +506,11 @@ def main() -> dict:
     if observe_mode:
         _set_output("observe_would_pass", str(passed).lower())
 
-    # Actionable outputs (FEAT-02)
+    # Actionable outputs (FEAT-02, FEAT-03)
     missing = _extract_missing_evidence(result)
     _set_multiline_output("missing_evidence", json.dumps(missing))
+    actions = _generate_suggested_actions(gate_type, result)
+    _set_multiline_output("suggested_actions", "\n".join(actions))
 
     _set_multiline_output("json_output", json.dumps(result))
 

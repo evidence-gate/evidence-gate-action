@@ -80,6 +80,9 @@ outputs:
   missing_evidence:
     description: "JSON array of missing evidence items [{code, message, field_path}]"
     value: ${{ steps.evidence_gate.outputs.missing_evidence }}
+  suggested_actions:
+    description: "Human-readable repair steps for failed gates"
+    value: ${{ steps.evidence_gate.outputs.suggested_actions }}
   json_output:
     description: "Full evaluation result as JSON string (use fromJson() to parse)"
     value: ${{ steps.evidence_gate.outputs.json_output }}
