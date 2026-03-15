@@ -40,6 +40,10 @@ inputs:
     description: "Enable verbose diagnostic output"
     required: false
     default: "false"
+  version:
+    description: "Evaluator version to install (set specific version to pip install evidence-gate-evaluator==X.Y.Z, or 'latest' for stdlib-only)"
+    required: false
+    default: "latest"
 
 outputs:
   passed:
@@ -75,6 +79,20 @@ runs:
       with:
         python-version: "3.12"
 
+    - name: Cache pip packages
+      if: inputs.version != 'latest' && inputs.version != ''
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-eg-${{ inputs.version }}
+        restore-keys: |
+          ${{ runner.os }}-pip-eg-
+
+    - name: Install evaluator
+      if: inputs.version != 'latest' && inputs.version != ''
+      shell: bash
+      run: pip install evidence-gate-evaluator==${{ inputs.version }}
+
     - name: Run Evidence Gate
       id: evidence_gate
       shell: bash
@@ -88,4 +106,5 @@ runs:
         EG_EVIDENCE_URL: ${{ inputs.evidence_url }}
         EG_RUN_ID: ${{ github.run_id }}
         EG_DEBUG: ${{ inputs.debug }}
+        EG_VERSION: ${{ inputs.version }}
       run: python ${{ github.action_path }}/src/entrypoint.py

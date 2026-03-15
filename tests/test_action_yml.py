@@ -57,11 +57,11 @@ class TestActionYml:
         assert "author" in data, "Missing recommended field: author"
 
     def test_action_yml_branding_values(self) -> None:
-        """Branding must use icon: shield, color: green."""
+        """Branding must use icon: shield, color: blue."""
         data = _load_action()
         branding = data["branding"]
         assert branding["icon"] == "shield", f"Expected icon 'shield', got '{branding['icon']}'"
-        assert branding["color"] == "green", f"Expected color 'green', got '{branding['color']}'"
+        assert branding["color"] == "blue", f"Expected color 'blue', got '{branding['color']}'"
 
     def test_action_yml_api_key_is_optional(self) -> None:
         """api_key input must be required: false with default: '' for Free mode."""

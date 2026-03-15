@@ -239,7 +239,9 @@ def main() -> dict:
     # Debug logging (DX-03)
     debug = os.environ.get("EG_DEBUG", "false").lower() == "true"
     if debug:
+        version = os.environ.get("EG_VERSION", "latest")
         print(f"[DEBUG] gate_type={gate_type}, phase_id={phase_id}, mode={mode}")
+        print(f"[DEBUG] version={version}")
         print(f"[DEBUG] evidence_files={evidence_file_paths}")
         print(f"[DEBUG] api_base={os.environ.get('EG_API_BASE', 'default')}")
         print(f"[DEBUG] run_id={run_id}")
