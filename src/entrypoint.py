@@ -98,6 +98,17 @@ def _detect_mode(api_key: str) -> str:
     return "pro"
 
 
+def _build_heading() -> str:
+    """Build summary heading, including gate_type/phase_id when available."""
+    gate_type = os.environ.get("EG_GATE_TYPE", "")
+    phase_id = os.environ.get("EG_PHASE_ID", "")
+    if gate_type and phase_id:
+        return f"## Evidence Gate: {gate_type} ({phase_id})"
+    elif gate_type:
+        return f"## Evidence Gate: {gate_type}"
+    return "## Evidence Gate"
+
+
 def _write_summary(
     *,
     run_id: str | None,
@@ -115,34 +126,36 @@ def _write_summary(
     trace_url = metadata_dict.get("trace_url")
     evidence_url = metadata_dict.get("evidence_url")
 
+    heading = _build_heading()
     status_text = "PASS" if passed else "FAIL"
-    rows = [
-        ("Run ID", run_id or "-"),
-        ("Mode", mode),
-        ("Result", status_text),
-        ("Major issues", str(len(issue_list))),
-        ("GitHub Run", github_run_url or "-"),
-        ("Langfuse Trace", trace_url or "-"),
-        ("Evidence URL", evidence_url or "-"),
-        ("Dashboard (supplemental)", dashboard_url or "-"),
-    ]
 
-    lines = [
-        "## Evidence Gate",
-        "",
-        "| Field | Value |",
-        "|---|---|",
-    ]
-    lines.extend([f"| {field} | {value} |" for field, value in rows])
+    # Always-visible result line
+    lines = [heading, "", f"**Result:** {status_text} | **Mode:** {mode}", ""]
 
+    # Optional metadata rows -- filter out empty values
+    optional_rows = [
+        ("Run ID", run_id),
+        ("GitHub Run", github_run_url),
+        ("Langfuse Trace", trace_url),
+        ("Evidence URL", evidence_url),
+        ("Dashboard", dashboard_url),
+    ]
+    visible_rows = [(k, v) for k, v in optional_rows if v and v != "-"]
+
+    if visible_rows:
+        lines.append("<details>")
+        lines.append("<summary>Metadata</summary>")
+        lines.append("")
+        lines.append("| Field | Value |")
+        lines.append("|---|---|")
+        lines.extend(f"| {k} | {v} |" for k, v in visible_rows)
+        lines.append("")
+        lines.append("</details>")
+
+    # Major issues (always visible, outside details)
     if major_issues:
-        lines.extend(
-            [
-                "",
-                "### Major Issues",
-            ]
-        )
-        lines.extend([f"- {issue}" for issue in major_issues])
+        lines.extend(["", "### Major Issues"])
+        lines.extend(f"- {issue}" for issue in major_issues)
 
     _append_summary("\n".join(lines))
 
@@ -167,17 +180,34 @@ def _write_error_summary(
     github_run_url: str | None,
     dashboard_url: str | None,
 ) -> None:
+    heading = _build_heading()
     lines = [
-        "## Evidence Gate",
+        heading,
         "",
-        "| Field | Value |",
-        "|---|---|",
-        f"| Run ID | {run_id or '-'} |",
-        "| Result | FAIL |",
-        f"| Error | {error_text} |",
-        f"| GitHub Run | {github_run_url or '-'} |",
-        f"| Dashboard (supplemental) | {dashboard_url or '-'} |",
+        "**Result:** FAIL",
+        "",
+        f"**Error:** {error_text}",
     ]
+
+    # Optional metadata rows -- filter out empty values
+    optional_rows = [
+        ("Run ID", run_id),
+        ("GitHub Run", github_run_url),
+        ("Dashboard", dashboard_url),
+    ]
+    visible_rows = [(k, v) for k, v in optional_rows if v and v != "-"]
+
+    if visible_rows:
+        lines.append("")
+        lines.append("<details>")
+        lines.append("<summary>Metadata</summary>")
+        lines.append("")
+        lines.append("| Field | Value |")
+        lines.append("|---|---|")
+        lines.extend(f"| {k} | {v} |" for k, v in visible_rows)
+        lines.append("")
+        lines.append("</details>")
+
     _append_summary("\n".join(lines))
 
 
@@ -202,7 +232,17 @@ def main() -> dict:
 
     # Mode detection
     api_key = os.environ.get("EG_API_KEY", "").strip()
+    if api_key:
+        print(f"::add-mask::{api_key}")
     mode = _detect_mode(api_key)
+
+    # Debug logging (DX-03)
+    debug = os.environ.get("EG_DEBUG", "false").lower() == "true"
+    if debug:
+        print(f"[DEBUG] gate_type={gate_type}, phase_id={phase_id}, mode={mode}")
+        print(f"[DEBUG] evidence_files={evidence_file_paths}")
+        print(f"[DEBUG] api_base={os.environ.get('EG_API_BASE', 'default')}")
+        print(f"[DEBUG] run_id={run_id}")
 
     if api_key:
         # Pro/Enterprise mode -- delegate to SaaS API
@@ -221,6 +261,7 @@ def main() -> dict:
                 evidence_url=evidence_url,
                 evidence=evidence or None,
             )
+            print("::notice title=Evidence Gate::OIDC authentication successful")
         except Exception as exc:
             _set_output("passed", "false")
             _set_output("mode", mode)
