@@ -44,12 +44,21 @@ Evidence Gate requires different permissions depending on which features you use
 | Issue creation on failure | `read` | — | `write` | — |
 | OIDC keyless auth (Pro) | `read` | — | — | `write` |
 
-A typical workflow with Check Run support:
+A typical workflow with Check Run support uses per-job permissions:
 
 ```yaml
-permissions:
-  contents: read
-  checks: write
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: evidence-gate/evidence-gate-action@v1
+        with:
+          gate_type: "test_coverage"
+          phase_id: "testing"
+          evidence_files: "coverage.json"
 ```
 
 ## Inputs
@@ -107,13 +116,12 @@ No API key needed. Validates that your test suite produced coverage evidence:
 name: Test Coverage Gate
 on: [pull_request]
 
-permissions:
-  contents: read
-  checks: write
-
 jobs:
   coverage-gate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
 
@@ -136,13 +144,12 @@ Evaluate security scan results after running a SAST/DAST tool:
 name: Security Gate
 on: [pull_request]
 
-permissions:
-  contents: read
-  checks: write
-
 jobs:
   security-gate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
 
@@ -165,13 +172,12 @@ Verify that your build step produced the expected output files:
 name: Build Gate
 on: [push]
 
-permissions:
-  contents: read
-  checks: write
-
 jobs:
   build-gate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
 
@@ -194,13 +200,12 @@ Run multiple gates in sequence — deploy only if all pass:
 name: Multi-Gate Pipeline
 on: [pull_request]
 
-permissions:
-  contents: read
-  checks: write
-
 jobs:
   quality-gates:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
 
@@ -233,14 +238,13 @@ Blind Gates hide evaluation criteria from the pipeline — the AI that generated
 name: Blind Gate Evaluation
 on: [pull_request]
 
-permissions:
-  contents: read
-  checks: write
-  id-token: write
-
 jobs:
   blind-gate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -266,13 +270,12 @@ on:
   schedule:
     - cron: "0 9 * * 1"  # Every Monday at 09:00 UTC
 
-permissions:
-  contents: read
-  checks: write
-
 jobs:
   weekly-gate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
 
