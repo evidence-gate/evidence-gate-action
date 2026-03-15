@@ -16,8 +16,8 @@ This is an open-source project under active development. We are shipping early b
 - **25 gate types** — test coverage, security, architecture, compliance, release readiness, and more
 - **Built for AI-driven development** — quality gates designed for a world where LLMs write code and tests
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Evidence%20Gate-blue.svg?logo=github)](https://github.com/marketplace/actions/evidence-gate-action)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Evidence%20Gate-green.svg?logo=github)](https://github.com/marketplace/actions/evidence-gate-action)
 
 ## Quick Start
 
@@ -31,30 +31,37 @@ Add this step to any GitHub Actions workflow:
     evidence_files: "coverage.json"
 ```
 
-The action evaluates `coverage.json` as test coverage evidence. If the evaluation fails, the step exits non-zero and your workflow stops.
+That's it. If the evidence is valid, the step passes. If not, it fails — no silent passes, no warnings to ignore.
 
-## How It Works
+## Permissions
 
-Evidence Gate operates in three modes depending on your configuration:
+Evidence Gate requires different permissions depending on which features you use:
 
-| Mode | Config | What It Does |
-|------|--------|-------------|
-| **Free** | No `api_key` | Client-side evaluation: file existence, JSON validation, schema checks, numeric thresholds |
-| **Pro** | `api_key` set | Full SaaS evaluation via Evidence Gate API: Blind Gate, Quality State, Remediation |
-| **Enterprise** | `api_key` + custom `api_base` | Self-hosted server with the same Pro features in your own infrastructure |
+| Feature | `contents` | `checks` | `issues` | `id-token` |
+|---------|:----------:|:--------:|:--------:|:----------:|
+| Basic gate evaluation | `read` | — | — | — |
+| Check Run annotations | `read` | `write` | — | — |
+| Issue creation on failure | `read` | — | `write` | — |
+| OIDC keyless auth (Pro) | `read` | — | — | `write` |
 
-Free mode requires **zero external dependencies** -- all checks run locally using Python stdlib. Pro and Enterprise modes call the Evidence Gate API for advanced evaluation features.
+A typical workflow with Check Run support:
+
+```yaml
+permissions:
+  contents: read
+  checks: write
+```
 
 ## Inputs
 
 | Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `gate_type` | **Yes** | -- | Gate type to evaluate (e.g., `test_coverage`, `security`, `build`, `skill`) |
-| `phase_id` | **Yes** | -- | Phase identifier (e.g., `build`, `test`, `deploy`, `1a`, `2b`) |
+|-------|:--------:|---------|-------------|
+| `gate_type` | **Yes** | — | Gate type to evaluate (e.g., `test_coverage`, `security`, `build`, `skill`) |
+| `phase_id` | **Yes** | — | Phase identifier (e.g., `build`, `test`, `deploy`) |
 | `evidence_files` | No | `""` | Comma-separated list of evidence file paths to validate |
-| `api_key` | No | `""` | Evidence Gate API key. Omit for Free mode. Required for Pro/Enterprise features |
-| `api_base` | No | `https://api.evidence-gate.dev` | API base URL. Change for self-hosted Enterprise deployments |
-| `dashboard_base_url` | No | `""` | Dashboard base URL for run/evidence deep links |
+| `api_key` | No | `""` | Evidence Gate API key. Omit for Free mode |
+| `api_base` | No | `https://api.evidence-gate.dev` | API base URL. Change for self-hosted Enterprise |
+| `dashboard_base_url` | No | `""` | Dashboard base URL for deep links |
 | `evidence_url` | No | `""` | Explicit evidence deep link URL |
 
 ## Outputs
@@ -62,22 +69,42 @@ Free mode requires **zero external dependencies** -- all checks run locally usin
 | Output | Description |
 |--------|-------------|
 | `passed` | Gate result: `true` or `false` |
-| `mode` | Detected operational mode: `free`, `pro`, or `enterprise` |
+| `mode` | Detected mode: `free`, `pro`, or `enterprise` |
 | `run_id` | Pipeline run ID |
 | `major_issue_count` | Number of detected issues |
-| `trace_url` | Langfuse trace URL (Pro/Enterprise only) |
+| `trace_url` | Trace URL (Pro/Enterprise) |
 | `evidence_url` | Evidence detail URL |
-| `dashboard_url` | Supplemental dashboard URL |
-| `github_run_url` | GitHub Actions run URL for this workflow execution |
+| `dashboard_url` | Dashboard URL |
+| `github_run_url` | GitHub Actions run URL |
 
-## Examples
+## Using Gate Results in Downstream Steps
 
-### Example 1: Test Coverage Gate (Free Mode)
-
-No API key needed. Evaluates test coverage evidence from your CI pipeline:
+Gate outputs can drive conditional logic in your workflow:
 
 ```yaml
-name: Quality Gate
+- name: Evidence Gate
+  id: gate
+  uses: evidence-gate/evidence-gate-action@v1
+  with:
+    gate_type: "test_coverage"
+    phase_id: "testing"
+    evidence_files: "coverage.json"
+
+- name: Deploy (only if gate passed)
+  if: steps.gate.outputs.passed == 'true'
+  run: ./deploy.sh
+```
+
+## Workflow Recipes
+
+Complete, copy-paste workflow files for common use cases. Each recipe includes the required `permissions` block.
+
+### Recipe 1: Test Coverage Gate (Free Mode)
+
+No API key needed. Validates that your test suite produced coverage evidence:
+
+```yaml
+name: Test Coverage Gate
 on: [pull_request]
 
 permissions:
@@ -85,12 +112,12 @@ permissions:
   checks: write
 
 jobs:
-  evaluate:
+  coverage-gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: pytest --cov --cov-report=json
 
       - name: Evidence Gate
@@ -101,16 +128,78 @@ jobs:
           evidence_files: "coverage.json"
 ```
 
-### Example 2: Full Evaluation with Pro Mode
+### Recipe 2: Security Scan Gate
 
-Enables Blind Gate, Quality State tracking, and remediation workflows:
+Evaluate security scan results after running a SAST/DAST tool:
 
 ```yaml
-name: Quality Gate (Pro)
+name: Security Gate
 on: [pull_request]
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
-  gate:
+  security-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run security scan
+        run: bandit -r src/ -f json -o security-report.json || true
+
+      - name: Evidence Gate
+        uses: evidence-gate/evidence-gate-action@v1
+        with:
+          gate_type: "security"
+          phase_id: "security-scan"
+          evidence_files: "security-report.json"
+```
+
+### Recipe 3: Build Artifact Gate
+
+Verify that your build step produced the expected output files:
+
+```yaml
+name: Build Gate
+on: [push]
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  build-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: npm run build
+
+      - name: Evidence Gate
+        uses: evidence-gate/evidence-gate-action@v1
+        with:
+          gate_type: "build"
+          phase_id: "build"
+          evidence_files: "dist/index.js,dist/index.css"
+```
+
+### Recipe 4: Multi-Gate Pipeline
+
+Run multiple gates in sequence — deploy only if all pass:
+
+```yaml
+name: Multi-Gate Pipeline
+on: [pull_request]
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  quality-gates:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -118,64 +207,119 @@ jobs:
       - name: Run tests
         run: pytest --cov --cov-report=json
 
-      - name: Evidence Gate
+      - name: Run security scan
+        run: bandit -r src/ -f json -o security-report.json || true
+
+      - name: Coverage Gate
         uses: evidence-gate/evidence-gate-action@v1
         with:
-          gate_type: "skill"
-          phase_id: "2b"
-          evidence_files: "coverage.json,test-results.json"
-          api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
+          gate_type: "test_coverage"
+          phase_id: "testing"
+          evidence_files: "coverage.json"
+
+      - name: Security Gate
+        uses: evidence-gate/evidence-gate-action@v1
+        with:
+          gate_type: "security"
+          phase_id: "security"
+          evidence_files: "security-report.json"
 ```
 
-### Example 3: Self-hosted Enterprise Mode
+### Recipe 5: Pro Mode with Blind Gate
 
-Point to your own Evidence Gate server:
+Blind Gates hide evaluation criteria from the pipeline — the AI that generated the code cannot see or game the thresholds:
 
 ```yaml
-name: Quality Gate (Enterprise)
+name: Blind Gate Evaluation
 on: [pull_request]
 
+permissions:
+  contents: read
+  checks: write
+  id-token: write
+
 jobs:
-  gate:
+  blind-gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Run tests
+        run: pytest --cov --cov-report=json
+
+      - name: Evidence Gate (Blind)
+        uses: evidence-gate/evidence-gate-action@v1
+        with:
+          gate_type: "skill"
+          phase_id: "quality-check"
+          evidence_files: "coverage.json"
+          api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
+```
+
+### Recipe 6: Scheduled Quality Assessment
+
+Run a weekly quality check against your main branch:
+
+```yaml
+name: Weekly Quality Assessment
+on:
+  schedule:
+    - cron: "0 9 * * 1"  # Every Monday at 09:00 UTC
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  weekly-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run full test suite
+        run: pytest --cov --cov-report=json
+
       - name: Evidence Gate
         uses: evidence-gate/evidence-gate-action@v1
         with:
-          gate_type: "security"
-          phase_id: "deploy"
-          evidence_files: "security-scan.json"
-          api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
-          api_base: "https://evidence-gate.internal.example.com"
+          gate_type: "release_readiness"
+          phase_id: "weekly-audit"
+          evidence_files: "coverage.json"
 ```
+
+## How It Works
+
+Evidence Gate operates in three modes depending on your configuration:
+
+| Mode | Config | What It Does |
+|------|--------|-------------|
+| **Free** | No `api_key` | Client-side evaluation: file existence, JSON validation, schema checks, numeric thresholds |
+| **Pro** | `api_key` set | Full SaaS evaluation: Blind Gate, Quality State, evidence chains (L4), remediation |
+| **Enterprise** | `api_key` + custom `api_base` | Self-hosted with the same Pro features in your own infrastructure |
+
+Free mode requires **zero external dependencies** — all checks run locally. Pro and Enterprise modes call the Evidence Gate API for advanced features.
 
 ## Free vs Pro
 
 | Feature | Free | Pro / Enterprise |
 |---------|:----:|:----------------:|
 | Gate evaluations/month | 100 | 5,000+ |
-| API calls/month | 1,000 | 50,000+ |
 | All 25 gate types | Yes | Yes |
 | SARIF output | Yes | Yes |
 | GitHub Check Runs | Yes | Yes |
-| Wave evaluation | Yes | Yes |
 | SHA-256 integrity hashing | Yes | Yes |
-| Blind Gate evaluation | -- | Yes |
-| Evidence chain verification (L4) | -- | Yes |
-| Quality State tracking | -- | Yes |
-| Remediation workflows | -- | Yes |
-| `GITHUB_STEP_SUMMARY` output | Yes | Yes |
 | Fail-closed error handling | Yes | Yes |
-
-When a Free mode user triggers a Pro-only gate type (e.g., `blind_gate`), the action does **not** fail. Instead, it emits a warning-level annotation with an upgrade link and passes the step.
+| `GITHUB_STEP_SUMMARY` | Yes | Yes |
+| Blind Gate evaluation | — | Yes |
+| Evidence chain verification (L4) | — | Yes |
+| Quality State tracking | — | Yes |
+| Remediation workflows | — | Yes |
 
 ## Troubleshooting
 
 ### "Gate type requires Pro plan" warning
 
-You are using a Pro-only gate type (`blind_gate`, `quality_state`, `remediation`, `composite`, or `wave`) without an `api_key`. The action will pass with a warning. To use these gate types, add your API key:
+You are using a Pro-only gate type without an `api_key`. Add your API key:
 
 ```yaml
 api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
@@ -183,27 +327,20 @@ api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
 
 ### Evidence file not found
 
-The action checks that every path in `evidence_files` exists on disk. Common causes:
-
-- **Relative paths**: Paths are resolved from the repository root (`$GITHUB_WORKSPACE`). Use relative paths like `coverage.json` or `reports/test-results.json`.
+- **Relative paths**: Paths are resolved from `$GITHUB_WORKSPACE`. Use `coverage.json`, not `/home/runner/work/.../coverage.json`.
 - **Missing build step**: Ensure your test/build step runs **before** the Evidence Gate step.
-- **Glob patterns**: The `evidence_files` input does not support globs. List each file explicitly, separated by commas.
+- **No glob support**: List each file explicitly, separated by commas.
 
 ### API connection errors (Pro/Enterprise)
 
-If the action fails with a network or API error:
-
 1. **Check your API key**: Ensure `EVIDENCE_GATE_API_KEY` is set in repository secrets.
-2. **Verify the API base URL**: For Enterprise, confirm `api_base` points to your server and is reachable from GitHub Actions runners.
-3. **Check service status**: Visit [status.evidence-gate.dev](https://status.evidence-gate.dev) for SaaS availability.
+2. **Verify the API base URL**: For Enterprise, confirm `api_base` is reachable from GitHub Actions runners.
 
-The action uses **fail-closed** semantics: any unhandled error causes the step to exit non-zero. This prevents false passes when the evaluation service is unreachable.
+The action uses **fail-closed** semantics: any unhandled error exits non-zero. This prevents false passes when the evaluation service is unreachable.
 
 ## Links
 
-- [Pro Plan & Pricing](https://evidence-gate.dev#pricing)
-- [Self-hosted Deployment Guide](https://evidence-gate.dev#pricing)
-- [Documentation](https://github.com/evidence-gate/evidence-gate-action#readme)
+- [Landing Page & Pricing](https://evidence-gate.dev)
 - [Changelog](CHANGELOG.md)
 
 ## License
