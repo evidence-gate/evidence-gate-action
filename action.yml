@@ -1,10 +1,10 @@
 name: "Evidence Gate Action"
-description: "Run quality gates in your CI/CD pipeline. Verify evidence, enforce thresholds, and track quality state."
+description: "Fail-closed quality gates for CI/CD pipelines. 25 gate types, tamper-proof evidence chains, and Blind Gate anti-gaming. Free forever for open-source."
 author: "evidence-gate"
 
 branding:
   icon: shield
-  color: green
+  color: blue
 
 inputs:
   api_key:
