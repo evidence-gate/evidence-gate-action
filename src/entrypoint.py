@@ -11,8 +11,10 @@ Supports three modes:
 
 from __future__ import annotations
 
+import json
 import os
 import sys
+import uuid
 from urllib.parse import urlencode
 
 from core import (
@@ -74,6 +76,19 @@ def _set_output(name: str, value: str) -> None:
     safe = value.replace("\n", " ").strip()
     with open(path, "a", encoding="utf-8") as f:
         f.write(f"{name}={safe}\n")
+
+
+def _set_multiline_output(name: str, value: str) -> None:
+    """Write a multi-line value to GITHUB_OUTPUT using heredoc delimiter.
+
+    Uses a uuid-based delimiter to avoid collision with value content.
+    """
+    path = os.environ.get("GITHUB_OUTPUT", "").strip()
+    if not path:
+        return
+    delimiter = f"ghadelimiter_{uuid.uuid4().hex[:8]}"
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(f"{name}<<{delimiter}\n{value}\n{delimiter}\n")
 
 
 def _emit_annotations(
@@ -300,7 +315,7 @@ def main() -> dict:
         checks: dict | None = None
         if checks_json:
             try:
-                checks = __import__("json").loads(checks_json)
+                checks = json.loads(checks_json)
             except (ValueError, TypeError):
                 checks = None
 
@@ -326,6 +341,7 @@ def main() -> dict:
         _set_output("run_id", run_id)
         _set_output("github_run_url", github_run_url or "")
         _set_output("dashboard_url", dashboard_url or "")
+        _set_multiline_output("json_output", json.dumps(result))
         return result
 
     # Standard result handling
@@ -357,6 +373,7 @@ def main() -> dict:
     _set_output("major_issue_count", str(len(issue_list)))
     if observe_mode:
         _set_output("observe_would_pass", str(passed).lower())
+    _set_multiline_output("json_output", json.dumps(result))
 
     return result
 
