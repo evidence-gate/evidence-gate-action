@@ -1,6 +1,20 @@
-# Evidence Gate
+# Evidence Gate Action
 
-**Run quality gates in your CI/CD pipeline.** Verify evidence files, enforce thresholds, and optionally integrate with Evidence Gate SaaS for Blind Gate evaluation, Quality State tracking, and remediation workflows.
+**AI writes your code and your tests. How do you prove quality to an auditor?**
+
+When AI agents (Copilot, Claude, Cursor) generate both production code and tests, traditional CI/CD gates lose their meaning. An LLM told to "achieve 80% coverage" will produce tests that hit exactly 80.1% — a number that satisfies the metric but proves nothing about quality. Worse, when an incident occurs, you cannot show auditors verifiable evidence that quality controls were genuinely enforced.
+
+Evidence Gate Action records every gate evaluation as **tamper-proof evidence** — from simple declarations (L1) to SHA-256 hash chains (L4) that any auditor can independently verify. Combined with **Blind Gates** — evaluation criteria hidden from the AI — your pipeline produces audit-grade proof that quality was built in, not gamed.
+
+The evidence model is designed with global regulatory frameworks in mind — SOC 2, ISO 27001, the EU AI Act's transparency requirements, Japan's AI guidelines, and similar standards that increasingly demand verifiable records of how AI-generated code was validated. Evidence Gate does not yet cover every requirement of every framework, and regulations themselves are still evolving. But the core architecture — immutable evidence chains, independent verifiability, fail-closed semantics — is built to grow with these standards, not retrofit compliance after the fact.
+
+This is an open-source project under active development. We are shipping early because the problem is urgent: AI-driven development is already here, and audit-grade tooling should not wait for perfection. We welcome feedback, contributions, and real-world use cases to shape Evidence Gate into the standard that teams and regulators can rely on together.
+
+- **Tamper-proof evidence chains** — every evaluation produces verifiable records (L1–L4) for compliance and audit readiness
+- **Blind Gates** (Pro) — hidden criteria that AI agents cannot see, reverse-engineer, or optimize against
+- **Fail-closed by default** — missing evidence or unreachable API means FAIL, never a silent pass
+- **25 gate types** — test coverage, security, architecture, compliance, release readiness, and more
+- **Built for AI-driven development** — quality gates designed for a world where LLMs write code and tests
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Evidence%20Gate-green.svg?logo=github)](https://github.com/marketplace/actions/evidence-gate-action)
