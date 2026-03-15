@@ -826,3 +826,129 @@ class TestJsonOutput:
         parsed = json.loads(json_str)
         assert "passed" in parsed
         assert "metadata" in parsed
+
+
+class TestMissingEvidence:
+    """FEAT-02: missing_evidence output for actionable gate failure data."""
+
+    def test_missing_evidence_from_structured_issues(self) -> None:
+        """Structured issues with MISSING codes are extracted."""
+        result = {
+            "passed": False,
+            "issues": [],
+            "structured_issues": [
+                {"code": "MISSING_EVIDENCE_FILE", "message": "No test report found", "field_path": "evidence.test_report"},
+                {"code": "SECURITY_SCAN_OK", "message": "Security scan passed", "field_path": "evidence.security"},
+                {"code": "MISSING_COVERAGE_DATA", "message": "Coverage data absent", "field_path": "evidence.coverage"},
+            ],
+        }
+        missing = entrypoint._extract_missing_evidence(result)
+        assert len(missing) == 2
+        assert missing[0]["code"] == "MISSING_EVIDENCE_FILE"
+        assert missing[0]["message"] == "No test report found"
+        assert missing[0]["field_path"] == "evidence.test_report"
+        assert missing[1]["code"] == "MISSING_COVERAGE_DATA"
+
+    def test_missing_evidence_from_plain_issues(self) -> None:
+        """Plain issues containing 'missing' are extracted with synthetic code."""
+        result = {
+            "passed": False,
+            "issues": ["Evidence missing for test gate", "Build succeeded"],
+        }
+        missing = entrypoint._extract_missing_evidence(result)
+        assert len(missing) == 1
+        assert missing[0]["code"] == "MISSING_EVIDENCE"
+        assert missing[0]["message"] == "Evidence missing for test gate"
+        assert missing[0]["field_path"] is None
+
+    def test_missing_evidence_from_not_found(self) -> None:
+        """Plain issues containing 'not found' are treated as missing evidence."""
+        result = {
+            "passed": False,
+            "issues": ["File not found: /path/to/evidence.json"],
+        }
+        missing = entrypoint._extract_missing_evidence(result)
+        assert len(missing) == 1
+        assert missing[0]["code"] == "MISSING_EVIDENCE"
+        assert "not found" in missing[0]["message"].lower()
+
+    def test_missing_evidence_empty_on_pass(self) -> None:
+        """Passing result returns empty list."""
+        result = {"passed": True, "issues": []}
+        missing = entrypoint._extract_missing_evidence(result)
+        assert missing == []
+
+    def test_missing_evidence_empty_when_no_missing_items(self) -> None:
+        """Result with issues but none containing 'missing' or MISSING codes."""
+        result = {
+            "passed": False,
+            "issues": ["Build failed with error code 1", "Test timeout exceeded"],
+            "structured_issues": [
+                {"code": "BUILD_FAIL", "message": "Compilation error", "field_path": "build"},
+            ],
+        }
+        missing = entrypoint._extract_missing_evidence(result)
+        assert missing == []
+
+    def test_missing_evidence_output_set_in_github_output(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """main() sets missing_evidence in GITHUB_OUTPUT on failure."""
+        import json
+
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {
+                "passed": False,
+                "issues": ["Evidence missing for gate"],
+                "metadata": {},
+            }
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        output_text = output.read_text()
+        assert "missing_evidence<<ghadelimiter_" in output_text
+
+    def test_missing_evidence_output_empty_array_on_pass(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """main() sets missing_evidence to [] when gate passes."""
+        import json
+        import re
+
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": True, "issues": [], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        output_text = output.read_text()
+        # Extract missing_evidence value from heredoc
+        match = re.search(
+            r"missing_evidence<<(ghadelimiter_\w+)\n(.*?)\n\1\n",
+            output_text,
+            re.DOTALL,
+        )
+        assert match is not None
+        parsed = json.loads(match.group(2))
+        assert parsed == []
