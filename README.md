@@ -12,12 +12,12 @@ Add this step to any GitHub Actions workflow:
 ```yaml
 - uses: evidence-gate/evidence-gate-action@v1
   with:
-    gate_type: "file_check"
-    phase_id: "build"
+    gate_type: "test_coverage"
+    phase_id: "testing"
     evidence_files: "coverage.json"
 ```
 
-The action checks that `coverage.json` exists and is valid JSON. If the check fails, the step exits non-zero and your workflow stops.
+The action evaluates `coverage.json` as test coverage evidence. If the evaluation fails, the step exits non-zero and your workflow stops.
 
 ## How It Works
 
@@ -35,7 +35,7 @@ Free mode requires **zero external dependencies** -- all checks run locally usin
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `gate_type` | **Yes** | -- | Gate type to evaluate (e.g., `file_check`, `skill`, `xac`, `security`) |
+| `gate_type` | **Yes** | -- | Gate type to evaluate (e.g., `test_coverage`, `security`, `build`, `skill`) |
 | `phase_id` | **Yes** | -- | Phase identifier (e.g., `build`, `test`, `deploy`, `1a`, `2b`) |
 | `evidence_files` | No | `""` | Comma-separated list of evidence file paths to validate |
 | `api_key` | No | `""` | Evidence Gate API key. Omit for Free mode. Required for Pro/Enterprise features |
@@ -58,16 +58,20 @@ Free mode requires **zero external dependencies** -- all checks run locally usin
 
 ## Examples
 
-### Example 1: Basic File Check (Free Mode)
+### Example 1: Test Coverage Gate (Free Mode)
 
-No API key needed. Validates that evidence files exist and contain valid JSON:
+No API key needed. Evaluates test coverage evidence from your CI pipeline:
 
 ```yaml
 name: Quality Gate
 on: [pull_request]
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
-  gate:
+  evaluate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -78,8 +82,8 @@ jobs:
       - name: Evidence Gate
         uses: evidence-gate/evidence-gate-action@v1
         with:
-          gate_type: "file_check"
-          phase_id: "test"
+          gate_type: "test_coverage"
+          phase_id: "testing"
           evidence_files: "coverage.json"
 ```
 
@@ -137,19 +141,18 @@ jobs:
 
 | Feature | Free | Pro / Enterprise |
 |---------|:----:|:----------------:|
-| File existence checks | Yes | Yes |
-| JSON validation | Yes | Yes |
-| Schema structure validation | Yes | Yes |
-| Numeric threshold checks | Yes | Yes |
+| Gate evaluations/month | 100 | 5,000+ |
+| API calls/month | 1,000 | 50,000+ |
+| All 25 gate types | Yes | Yes |
+| SARIF output | Yes | Yes |
+| GitHub Check Runs | Yes | Yes |
+| Wave evaluation | Yes | Yes |
 | SHA-256 integrity hashing | Yes | Yes |
 | Blind Gate evaluation | -- | Yes |
+| Evidence chain verification (L4) | -- | Yes |
 | Quality State tracking | -- | Yes |
 | Remediation workflows | -- | Yes |
-| Composite gates | -- | Yes |
-| Wave evaluation | -- | Yes |
-| Langfuse trace URLs | -- | Yes |
 | `GITHUB_STEP_SUMMARY` output | Yes | Yes |
-| Workflow annotations | Yes | Yes |
 | Fail-closed error handling | Yes | Yes |
 
 When a Free mode user triggers a Pro-only gate type (e.g., `blind_gate`), the action does **not** fail. Instead, it emits a warning-level annotation with an upgrade link and passes the step.
@@ -186,7 +189,7 @@ The action uses **fail-closed** semantics: any unhandled error causes the step t
 
 - [Pro Plan & Pricing](https://evidence-gate.dev#pricing)
 - [Self-hosted Deployment Guide](https://evidence-gate.dev#pricing)
-- [Documentation](https://evidence-gate.dev)
+- [Documentation](https://docs.evidence-gate.dev)
 - [Changelog](CHANGELOG.md)
 
 ## License
