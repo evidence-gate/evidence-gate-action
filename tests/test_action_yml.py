@@ -82,3 +82,31 @@ class TestActionYml:
         )
         mode_desc = data["outputs"]["mode"]["description"]
         assert mode_desc, "mode output must have a non-empty description"
+
+    def test_version_input_exists(self) -> None:
+        """action.yml must have a 'version' input with default 'latest'."""
+        data = _load_action()
+        assert "version" in data["inputs"], (
+            f"'version' not in inputs: {list(data['inputs'].keys())}"
+        )
+        version_input = data["inputs"]["version"]
+        assert version_input["default"] == "latest", (
+            f"version.default must be 'latest', got {version_input['default']!r}"
+        )
+        assert version_input["required"] is False, (
+            f"version.required must be false, got {version_input['required']}"
+        )
+
+    def test_cache_step_exists(self) -> None:
+        """action.yml must have a step using actions/cache for pip caching."""
+        raw = _load_raw()
+        assert "actions/cache@" in raw, (
+            "action.yml must contain an actions/cache step for pip caching"
+        )
+
+    def test_pip_install_step_exists(self) -> None:
+        """action.yml must have a conditional pip install step."""
+        raw = _load_raw()
+        assert "pip install" in raw, (
+            "action.yml must contain a 'pip install' step for version pinning"
+        )

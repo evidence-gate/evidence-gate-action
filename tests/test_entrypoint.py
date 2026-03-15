@@ -386,6 +386,28 @@ class TestDebugOutput:
         captured = capsys.readouterr()
         assert "[DEBUG]" not in captured.out
 
+    def test_debug_output_includes_version(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys
+    ) -> None:
+        """When EG_DEBUG=true and EG_VERSION=1.2.0, debug output includes version info."""
+        monkeypatch.delenv("EG_API_KEY")
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("EG_DEBUG", "true")
+        monkeypatch.setenv("EG_VERSION", "1.2.0")
+
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+
+        entrypoint.main()
+
+        captured = capsys.readouterr()
+        assert "[DEBUG]" in captured.out
+        assert "version=1.2.0" in captured.out
+
 
 class TestOIDCMasking:
     """SEC-04: OIDC token masking and auth notice."""
