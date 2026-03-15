@@ -3,7 +3,7 @@
 **Run quality gates in your CI/CD pipeline.** Verify evidence files, enforce thresholds, and optionally integrate with Evidence Gate SaaS for Blind Gate evaluation, Quality State tracking, and remediation workflows.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Evidence%20Gate-green.svg?logo=github)](https://github.com/marketplace/actions/evidence-gate)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Evidence%20Gate-green.svg?logo=github)](https://github.com/marketplace/actions/evidence-gate-action)
 
 ## Quick Start
 
@@ -189,7 +189,7 @@ The action uses **fail-closed** semantics: any unhandled error causes the step t
 
 - [Pro Plan & Pricing](https://evidence-gate.dev#pricing)
 - [Self-hosted Deployment Guide](https://evidence-gate.dev#pricing)
-- [Documentation](https://docs.evidence-gate.dev)
+- [Documentation](https://github.com/evidence-gate/evidence-gate-action#readme)
 - [Changelog](CHANGELOG.md)
 
 ## License
