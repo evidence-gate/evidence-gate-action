@@ -48,6 +48,14 @@ inputs:
     description: "Evaluator version to install (set specific version to pip install evidence-gate-evaluator==X.Y.Z, or 'latest' for stdlib-only)"
     required: false
     default: "latest"
+  gate_preset:
+    description: "Named gate bundle (web-app-baseline, enterprise-compliance, api-service, supply-chain). When set, runs all gates in the preset sequentially. Ignored when gate_type is also provided."
+    required: false
+    default: ""
+  sticky_comment:
+    description: "When true, aggregates results into a single updating PR comment. Requires pull-requests: write permission."
+    required: false
+    default: "false"
 
 outputs:
   passed:
@@ -124,4 +132,7 @@ runs:
         EG_RUN_ID: ${{ github.run_id }}
         EG_DEBUG: ${{ inputs.debug }}
         EG_VERSION: ${{ inputs.version }}
+        EG_GATE_PRESET: ${{ inputs.gate_preset }}
+        EG_STICKY_COMMENT: ${{ inputs.sticky_comment }}
+        GITHUB_TOKEN: ${{ github.token }}
       run: python ${{ github.action_path }}/src/entrypoint.py

@@ -25,6 +25,8 @@ from core import (
     fail_closed_main,
 )
 from local_evaluator import evaluate_local
+from presets import expand_preset
+from sticky_comment import _get_pr_context, post_sticky_comment
 
 MAX_ANNOTATIONS = 10
 MAX_MAJOR_ISSUES = 5
@@ -365,51 +367,24 @@ def _write_error_summary(
     _append_summary("\n".join(lines))
 
 
-def main() -> dict:
-    """Run Evidence Gate evaluation for GitHub Actions."""
-    gate_type = os.environ.get("EG_GATE_TYPE", "")
-    phase_id = os.environ.get("EG_PHASE_ID", "")
-    run_id = os.environ.get("EG_RUN_ID", "") or os.environ.get("GITHUB_RUN_ID", "")
-    evidence_files_str = os.environ.get("EG_EVIDENCE_FILES", "")
-    github_run_url = _github_run_url()
-    dashboard_url = _build_dashboard_url(run_id or None)
-    evidence_url = os.environ.get("EG_EVIDENCE_URL", "").strip() or dashboard_url
+def _evaluate_single_gate(
+    *,
+    gate_type: str,
+    phase_id: str,
+    api_key: str,
+    evidence_file_paths: list[str],
+    run_id: str,
+    github_run_url: str | None,
+    evidence_url: str | None,
+    dashboard_url: str | None,
+    mode: str,
+) -> dict:
+    """Evaluate a single gate. Returns result dict.
 
-    if not gate_type or not phase_id:
-        print("ERROR: EG_GATE_TYPE and EG_PHASE_ID are required", file=sys.stderr)
-        sys.exit(1)
-
-    # Parse evidence file paths
-    evidence_file_paths: list[str] = []
-    if evidence_files_str:
-        evidence_file_paths = [p.strip() for p in evidence_files_str.split(",") if p.strip()]
-
-    # Mode detection
-    api_key = os.environ.get("EG_API_KEY", "").strip()
+    Handles Pro/Enterprise (API) and Free (local) modes.
+    Raises on Pro/Enterprise API errors.
+    """
     if api_key:
-        print(f"::add-mask::{api_key}")
-    mode = _detect_mode(api_key)
-
-    # Observe mode detection
-    observe_mode = os.environ.get("EG_MODE", "enforce").lower() == "observe"
-    if observe_mode:
-        print(
-            "::notice title=Evidence Gate::"
-            "Running in observe mode -- failures will not block this step"
-        )
-
-    # Debug logging (DX-03)
-    debug = os.environ.get("EG_DEBUG", "false").lower() == "true"
-    if debug:
-        version = os.environ.get("EG_VERSION", "latest")
-        print(f"[DEBUG] gate_type={gate_type}, phase_id={phase_id}, mode={mode}")
-        print(f"[DEBUG] version={version}")
-        print(f"[DEBUG] evidence_files={evidence_file_paths}")
-        print(f"[DEBUG] api_base={os.environ.get('EG_API_BASE', 'default')}")
-        print(f"[DEBUG] run_id={run_id}")
-
-    if api_key:
-        # Pro/Enterprise mode -- delegate to SaaS API
         evidence: dict = {}
         if evidence_file_paths:
             refs = collect_evidence_refs(evidence_file_paths)
@@ -440,7 +415,6 @@ def main() -> dict:
             )
             raise
     else:
-        # Free mode -- local evaluation
         checks_json = os.environ.get("EG_CHECKS", "").strip()
         checks: dict | None = None
         if checks_json:
@@ -456,10 +430,48 @@ def main() -> dict:
             checks=checks,
         )
 
+    # Attach gate_type for multi-gate aggregation
+    result["gate_type"] = gate_type
+    return result
+
+
+def _handle_sticky_comment(
+    results: list[dict],
+    observe_mode: bool,
+) -> None:
+    """Post sticky comment if enabled and in PR context."""
+    sticky_enabled = os.environ.get("EG_STICKY_COMMENT", "false").lower() == "true"
+    if not sticky_enabled:
+        return
+
+    pr_context = _get_pr_context()
+    if pr_context is None:
+        print(
+            "::warning title=Evidence Gate::"
+            "sticky_comment=true but no PR context (not a pull_request event)"
+        )
+        return
+
+    owner, repo, pr_number = pr_context
+    token = os.environ.get("GITHUB_TOKEN", "")
+    post_sticky_comment(owner, repo, pr_number, token, results, observe_mode)
+
+
+def _handle_result(
+    *,
+    result: dict,
+    gate_type: str,
+    run_id: str,
+    github_run_url: str | None,
+    dashboard_url: str | None,
+    evidence_url: str | None,
+    mode: str,
+    observe_mode: bool,
+) -> None:
+    """Write summary, annotations, and outputs for a single-gate result."""
     # Handle upsell (Free mode + Pro-only gate type)
     if result.get("upsell"):
         upsell_msg = result.get("upsell_message", "")
-        # Emit warning-level annotation (not error)
         print(
             f"::warning title=Evidence Gate::"
             f"{_escape_workflow_command(upsell_msg)}"
@@ -474,7 +486,7 @@ def main() -> dict:
         _set_multiline_output("missing_evidence", json.dumps([]))
         _set_multiline_output("suggested_actions", "")
         _set_multiline_output("json_output", json.dumps(result))
-        return result
+        return
 
     # Standard result handling
     metadata = result.get("metadata")
@@ -513,6 +525,153 @@ def main() -> dict:
     _set_multiline_output("suggested_actions", "\n".join(actions))
 
     _set_multiline_output("json_output", json.dumps(result))
+
+
+def main() -> dict:
+    """Run Evidence Gate evaluation for GitHub Actions."""
+    gate_type = os.environ.get("EG_GATE_TYPE", "").strip()
+    phase_id = os.environ.get("EG_PHASE_ID", "").strip()
+    gate_preset = os.environ.get("EG_GATE_PRESET", "").strip()
+    run_id = os.environ.get("EG_RUN_ID", "") or os.environ.get("GITHUB_RUN_ID", "")
+    evidence_files_str = os.environ.get("EG_EVIDENCE_FILES", "")
+    github_run_url = _github_run_url()
+    dashboard_url = _build_dashboard_url(run_id or None)
+    evidence_url = os.environ.get("EG_EVIDENCE_URL", "").strip() or dashboard_url
+
+    # Resolve gate_type vs gate_preset
+    if gate_type and gate_preset:
+        # gate_type takes precedence
+        debug = os.environ.get("EG_DEBUG", "false").lower() == "true"
+        if debug:
+            print("[DEBUG] gate_type takes precedence over gate_preset")
+        gate_preset = ""  # ignore preset
+
+    if not gate_type and not gate_preset:
+        if not phase_id:
+            print("ERROR: EG_GATE_TYPE and EG_PHASE_ID are required", file=sys.stderr)
+        else:
+            print("ERROR: Either gate_type or gate_preset is required", file=sys.stderr)
+        sys.exit(1)
+
+    if not phase_id:
+        print("ERROR: EG_PHASE_ID is required", file=sys.stderr)
+        sys.exit(1)
+
+    # Parse evidence file paths
+    evidence_file_paths: list[str] = []
+    if evidence_files_str:
+        evidence_file_paths = [p.strip() for p in evidence_files_str.split(",") if p.strip()]
+
+    # Mode detection
+    api_key = os.environ.get("EG_API_KEY", "").strip()
+    if api_key:
+        print(f"::add-mask::{api_key}")
+    mode = _detect_mode(api_key)
+
+    # Observe mode detection
+    observe_mode = os.environ.get("EG_MODE", "enforce").lower() == "observe"
+    if observe_mode:
+        print(
+            "::notice title=Evidence Gate::"
+            "Running in observe mode -- failures will not block this step"
+        )
+
+    # Debug logging (DX-03)
+    debug = os.environ.get("EG_DEBUG", "false").lower() == "true"
+    if debug:
+        version = os.environ.get("EG_VERSION", "latest")
+        print(f"[DEBUG] gate_type={gate_type}, phase_id={phase_id}, mode={mode}")
+        print(f"[DEBUG] version={version}")
+        print(f"[DEBUG] evidence_files={evidence_file_paths}")
+        print(f"[DEBUG] api_base={os.environ.get('EG_API_BASE', 'default')}")
+        print(f"[DEBUG] run_id={run_id}")
+        if gate_preset:
+            print(f"[DEBUG] gate_preset={gate_preset}")
+
+    # -- Preset mode: expand and evaluate multiple gates --
+    if gate_preset:
+        gate_types = expand_preset(gate_preset)
+        results: list[dict] = []
+
+        for gt in gate_types:
+            os.environ["EG_GATE_TYPE"] = gt  # for _build_heading
+            result = _evaluate_single_gate(
+                gate_type=gt,
+                phase_id=phase_id,
+                api_key=api_key,
+                evidence_file_paths=evidence_file_paths,
+                run_id=run_id,
+                github_run_url=github_run_url,
+                evidence_url=evidence_url,
+                dashboard_url=dashboard_url,
+                mode=mode,
+            )
+            results.append(result)
+
+            # Write per-gate summary
+            _write_summary(
+                run_id=run_id or None,
+                result=result,
+                github_run_url=github_run_url,
+                dashboard_url=dashboard_url,
+                mode=mode,
+                observe_mode=observe_mode,
+            )
+
+        # Aggregate results
+        all_passed = all(r.get("passed", False) for r in results)
+        all_missing: list[dict] = []
+        all_actions: list[str] = []
+        for r in results:
+            all_missing.extend(_extract_missing_evidence(r))
+            all_actions.extend(
+                _generate_suggested_actions(r.get("gate_type", ""), r)
+            )
+
+        # Set outputs
+        _set_output("passed", str(all_passed).lower())
+        _set_output("mode", mode)
+        _set_output("run_id", run_id)
+        _set_output("github_run_url", github_run_url or "")
+        _set_output("dashboard_url", dashboard_url or "")
+        if observe_mode:
+            _set_output("observe_would_pass", str(all_passed).lower())
+        _set_multiline_output("missing_evidence", json.dumps(all_missing))
+        _set_multiline_output("suggested_actions", "\n".join(all_actions))
+        _set_multiline_output("json_output", json.dumps(results))
+
+        # Sticky comment
+        _handle_sticky_comment(results, observe_mode)
+
+        # Return aggregated result for fail_closed_main
+        return {"passed": all_passed, "results": results}
+
+    # -- Single gate mode --
+    result = _evaluate_single_gate(
+        gate_type=gate_type,
+        phase_id=phase_id,
+        api_key=api_key,
+        evidence_file_paths=evidence_file_paths,
+        run_id=run_id,
+        github_run_url=github_run_url,
+        evidence_url=evidence_url,
+        dashboard_url=dashboard_url,
+        mode=mode,
+    )
+
+    _handle_result(
+        result=result,
+        gate_type=gate_type,
+        run_id=run_id,
+        github_run_url=github_run_url,
+        dashboard_url=dashboard_url,
+        evidence_url=evidence_url,
+        mode=mode,
+        observe_mode=observe_mode,
+    )
+
+    # Sticky comment (single gate)
+    _handle_sticky_comment([result], observe_mode)
 
     return result
 

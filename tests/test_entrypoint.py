@@ -8,6 +8,8 @@ Verifies:
 - Mode output value (new)
 - Observe mode (FEAT-01)
 - json_output (FEAT-06)
+- Gate presets (FEAT-04)
+- Sticky PR comments (FEAT-05)
 """
 
 from __future__ import annotations
@@ -1082,3 +1084,187 @@ class TestSuggestedActions:
 
         output_text = output.read_text()
         assert "suggested_actions<<ghadelimiter_" in output_text
+
+
+class TestGatePresets:
+    """FEAT-04: Gate preset expansion and multi-gate evaluation."""
+
+    def test_preset_expands_and_evaluates_all_gates(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """web-app-baseline preset evaluates 4 gates and all pass."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.delenv("EG_API_KEY")
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.setenv("EG_GATE_PRESET", "web-app-baseline")
+        monkeypatch.setenv("EG_GATE_TYPE", "")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_MODE", raising=False)
+        monkeypatch.delenv("EG_STICKY_COMMENT", raising=False)
+
+        result = entrypoint.main()
+        assert result["passed"] is True
+        assert len(result["results"]) == 4
+
+        output_text = output.read_text()
+        assert "passed=true" in output_text
+
+    def test_preset_fails_if_any_gate_fails(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """If one gate in preset fails, combined passed is False."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_PRESET", "web-app-baseline")
+        monkeypatch.setenv("EG_GATE_TYPE", "")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+        monkeypatch.delenv("EG_STICKY_COMMENT", raising=False)
+
+        eval_count = {"n": 0}
+
+        def _fake_evaluate(**kwargs):
+            eval_count["n"] += 1
+            # Second gate fails
+            if eval_count["n"] == 2:
+                return {
+                    "passed": False,
+                    "issues": ["security issue found"],
+                    "metadata": {},
+                }
+            return {"passed": True, "issues": [], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        result = entrypoint.main()
+        assert result["passed"] is False
+
+        output_text = output.read_text()
+        assert "passed=false" in output_text
+
+    def test_gate_type_takes_precedence_over_preset(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """When both gate_type and gate_preset are set, gate_type wins."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "security")
+        monkeypatch.setenv("EG_GATE_PRESET", "web-app-baseline")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+        monkeypatch.delenv("EG_STICKY_COMMENT", raising=False)
+
+        eval_calls: list[dict] = []
+
+        def _fake_evaluate(**kwargs):
+            eval_calls.append(kwargs)
+            return {"passed": True, "issues": [], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        result = entrypoint.main()
+
+        # Should be single evaluation (not 4 from preset)
+        assert len(eval_calls) == 1
+        assert eval_calls[0]["gate_type"] == "security"
+
+    def test_neither_gate_type_nor_preset_exits(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """When neither gate_type nor gate_preset is set, exits with error."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "")
+        monkeypatch.setenv("EG_GATE_PRESET", "")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        with pytest.raises(SystemExit) as exc_info:
+            entrypoint.main()
+        assert exc_info.value.code == 1
+
+
+class TestStickyComment:
+    """FEAT-05: Sticky PR comment integration in entrypoint."""
+
+    def test_sticky_comment_called_in_pr_context(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """When sticky_comment=true and in PR context, post_sticky_comment is called."""
+        import json as json_mod
+
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        event_file = tmp_path / "event.json"
+        event_file.write_text(json_mod.dumps({"pull_request": {"number": 42}}))
+
+        monkeypatch.delenv("EG_API_KEY")
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.setenv("EG_GATE_TYPE", "security")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("EG_STICKY_COMMENT", "true")
+        monkeypatch.setenv("GITHUB_TOKEN", "ghp_test123")
+        monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
+        monkeypatch.setenv("GITHUB_REPOSITORY", "myorg/myrepo")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        sticky_calls: list[dict] = []
+        original_post = entrypoint.post_sticky_comment
+
+        def _mock_post(owner, repo, pr_number, token, results, observe):
+            sticky_calls.append({
+                "owner": owner,
+                "repo": repo,
+                "pr_number": pr_number,
+                "token": token,
+                "results": results,
+                "observe": observe,
+            })
+
+        monkeypatch.setattr(entrypoint, "post_sticky_comment", _mock_post)
+
+        entrypoint.main()
+
+        assert len(sticky_calls) == 1
+        assert sticky_calls[0]["owner"] == "myorg"
+        assert sticky_calls[0]["repo"] == "myrepo"
+        assert sticky_calls[0]["pr_number"] == 42
+        assert sticky_calls[0]["token"] == "ghp_test123"
+
+    def test_sticky_comment_warns_without_pr_context(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys
+    ) -> None:
+        """When sticky_comment=true but not in PR context, emits ::warning::."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+
+        monkeypatch.delenv("EG_API_KEY")
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.setenv("EG_GATE_TYPE", "security")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("EG_STICKY_COMMENT", "true")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        monkeypatch.setattr(entrypoint, "_get_pr_context", lambda: None)
+
+        entrypoint.main()
+
+        captured = capsys.readouterr()
+        assert "::warning title=Evidence Gate::" in captured.out
+        assert "no PR context" in captured.out
