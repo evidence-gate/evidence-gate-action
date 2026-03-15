@@ -678,3 +678,151 @@ class TestObserveMode:
         with pytest.raises(SystemExit) as exc_info:
             fail_closed_main(entrypoint.main)
         assert exc_info.value.code == 1
+
+
+class TestJsonOutput:
+    """FEAT-06: json_output via _set_multiline_output with heredoc delimiter."""
+
+    def test_set_multiline_output_uses_heredoc(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """_set_multiline_output writes heredoc-delimited value to GITHUB_OUTPUT."""
+        output = tmp_path / "output.txt"
+        output.write_text("")  # ensure file exists
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+
+        entrypoint._set_multiline_output("test", "line1\nline2")
+
+        content = output.read_text()
+        # Must contain heredoc pattern: name<<delimiter\nvalue\ndelimiter\n
+        assert "test<<ghadelimiter_" in content
+        assert "line1\nline2" in content
+        # Verify delimiter appears twice (open + close)
+        lines = content.strip().split("\n")
+        delimiter_lines = [l for l in lines if l.startswith("ghadelimiter_")]
+        assert len(delimiter_lines) == 1  # closing delimiter on its own line
+
+    def test_json_output_set_on_pass(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """json_output is set in GITHUB_OUTPUT on passing result."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": True, "issues": [], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        output_text = output.read_text()
+        assert "json_output<<ghadelimiter_" in output_text
+
+    def test_json_output_set_on_fail(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """json_output is set in GITHUB_OUTPUT even on failing result."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["fail"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        output_text = output.read_text()
+        assert "json_output<<ghadelimiter_" in output_text
+
+    def test_json_output_in_free_mode(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """json_output is set in Free mode."""
+        monkeypatch.delenv("EG_API_KEY")
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+
+        entrypoint.main()
+
+        output_text = output.read_text()
+        assert "json_output<<ghadelimiter_" in output_text
+
+    def test_json_output_in_observe_mode(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """json_output is set in observe mode."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "observe")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["issue"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        fail_closed_main(entrypoint.main)
+
+        output_text = output.read_text()
+        assert "json_output<<ghadelimiter_" in output_text
+
+    def test_json_output_is_valid_json(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """json_output content is valid parseable JSON."""
+        import json
+        import re
+
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": True, "issues": [], "metadata": {"trace_url": "t"}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        output_text = output.read_text()
+        # Extract JSON between heredoc delimiters
+        match = re.search(
+            r"json_output<<(ghadelimiter_\w+)\n(.*?)\n\1\n",
+            output_text,
+            re.DOTALL,
+        )
+        assert match is not None, f"heredoc pattern not found in: {output_text}"
+        json_str = match.group(2)
+        parsed = json.loads(json_str)
+        assert "passed" in parsed
+        assert "metadata" in parsed
