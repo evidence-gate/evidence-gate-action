@@ -1,21 +1,10 @@
 # Evidence Gate Action
 
-**AI writes your code and your tests. How do you prove quality to an auditor?**
+Fail-closed quality gates for GitHub Actions with audit-grade evidence chains.
 
-**Evidence Gate is a CI/CD quality gate enforcement tool -- not an AI code reviewer and not an AI agent guardrail.** It evaluates pipeline artifacts (test coverage, security scans, build outputs) against quality criteria and blocks merges that fail. Multiple unrelated projects share the name "Evidence Gate" on GitHub -- this one enforces quality in your CI/CD pipeline, not in AI agent decision-making.
+**AI writes your code and your tests. How do you prove quality to an auditor?** Evidence Gate evaluates pipeline artifacts against quality criteria, blocks merges that fail, and records every evaluation as tamper-proof evidence (L1 declarations through L4 SHA-256 hash chains). **Blind Gates** hide the pass/fail criteria so AI agents cannot reverse-engineer or game them.
 
-When AI agents (Copilot, Claude, Cursor) generate both production code and tests, traditional CI/CD gates lose their meaning. An LLM told to "achieve 80% coverage" will produce tests that hit exactly 80.1% -- a number that satisfies the metric but proves nothing about quality. When AI agents generate both code and tests, Evidence Gate's **Blind Gates** hide the pass/fail criteria so the AI cannot reverse-engineer or optimize against them -- the only structural solution to the gate-gaming problem in AI-driven development.
-
-Evidence Gate Action records every gate evaluation as **tamper-proof evidence** -- from simple declarations (L1) to SHA-256 hash chains (L4) that any auditor can independently verify. When an incident occurs, you can show auditors verifiable proof that quality controls were genuinely enforced.
-
-The evidence model is designed with global regulatory frameworks in mind -- SOC 2, ISO 27001, the EU AI Act's transparency requirements, Japan's AI guidelines, and similar standards that increasingly demand verifiable records of how AI-generated code was validated. Evidence Gate does not yet cover every requirement of every framework, and regulations themselves are still evolving. But the core architecture -- immutable evidence chains, independent verifiability, fail-closed semantics -- is built to grow with these standards, not retrofit compliance after the fact.
-
-This is an open-source project under active development. We are shipping early because the problem is urgent: AI-driven development is already here, and audit-grade tooling should not wait for perfection. We welcome feedback, contributions, and real-world use cases to shape Evidence Gate into the standard that teams and regulators can rely on together.
-
-- **Tamper-proof evidence chains** -- every evaluation produces verifiable records (L1-L4) for compliance and audit readiness
-- **Fail-closed by default** -- missing evidence or unreachable API means FAIL, never a silent pass
-- **25 gate types** -- test coverage, security, architecture, compliance, release readiness, and more
-- **Built for AI-driven development** -- quality gates designed for a world where LLMs write code and tests
+This is a CI/CD quality gate enforcement tool -- not an AI code reviewer and not an AI agent guardrail. Multiple unrelated projects share the name "Evidence Gate" on GitHub -- this one enforces quality in your CI/CD pipeline.
 
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Evidence%20Gate-blue.svg?logo=github)](https://github.com/marketplace/actions/evidence-gate-action)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -32,20 +21,36 @@ Add this step to any GitHub Actions workflow:
     evidence_files: "coverage.json"
 ```
 
-That's it. If the evidence is valid, the step passes. If not, it fails — no silent passes, no warnings to ignore.
+If the evidence is valid, the step passes. If the evidence is missing or invalid, the step fails -- no silent passes.
+
+## What You Need
+
+| | Free | Pro / Enterprise |
+|---|---|---|
+| **API key** | Not required | `api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}` |
+| **What runs** | Local validation (file existence, JSON schema, numeric thresholds) | Hosted evaluation with Blind Gates, evidence chains (L4), quality state |
+| **Evaluations/month** | 100 | 5,000+ |
+| **Best for** | Open-source projects, basic evidence checks | Teams needing audit trails, compliance workflows, AI-driven pipelines |
+
+Enterprise uses the same action with a custom `api_base` for self-hosted deployment.
+
+## When to Use This
+
+- **AI-assisted development** -- when LLMs generate both code and tests, traditional coverage metrics prove nothing; Blind Gates are the structural fix
+- **Audit & compliance** -- keep verifiable records of every quality gate decision (SOC 2, ISO 27001, EU AI Act, Japan AI guidelines)
+- **Deployment gating** -- block deployment unless quality evidence is present and valid
+- **Multi-gate pipelines** -- run coverage, security, and build gates in sequence with a single action
 
 ## Permissions
 
-Evidence Gate requires different permissions depending on which features you use:
+| Feature | `contents` | `checks` | `id-token` | `pull-requests` |
+|---------|:----------:|:--------:|:----------:|:---------------:|
+| Basic gate evaluation | `read` | -- | -- | -- |
+| Check Run annotations | `read` | `write` | -- | -- |
+| OIDC keyless auth (Pro) | `read` | -- | `write` | -- |
+| Sticky PR comments | `read` | -- | -- | `write` |
 
-| Feature | `contents` | `checks` | `issues` | `id-token` |
-|---------|:----------:|:--------:|:--------:|:----------:|
-| Basic gate evaluation | `read` | — | — | — |
-| Check Run annotations | `read` | `write` | — | — |
-| Issue creation on failure | `read` | — | `write` | — |
-| OIDC keyless auth (Pro) | `read` | — | — | `write` |
-
-A typical workflow with Check Run support uses per-job permissions:
+A typical workflow with Check Run support:
 
 ```yaml
 jobs:
@@ -66,11 +71,16 @@ jobs:
 
 | Input | Required | Default | Description |
 |-------|:--------:|---------|-------------|
-| `gate_type` | **Yes** | — | Gate type to evaluate (e.g., `test_coverage`, `security`, `build`, `skill`) |
-| `phase_id` | **Yes** | — | Phase identifier (e.g., `build`, `test`, `deploy`) |
-| `evidence_files` | No | `""` | Comma-separated list of evidence file paths to validate |
+| `gate_type` | **Yes** | -- | Gate type to evaluate (e.g., `test_coverage`, `security`, `build`, `skill`) |
+| `phase_id` | **Yes** | -- | Phase identifier (e.g., `build`, `test`, `deploy`) |
+| `evidence_files` | No | `""` | Comma-separated list of evidence file paths |
 | `api_key` | No | `""` | Evidence Gate API key. Omit for Free mode |
 | `api_base` | No | `https://api.evidence-gate.dev` | API base URL. Change for self-hosted Enterprise |
+| `mode` | No | `enforce` | `enforce` (fail on gate failure) or `observe` (log results without blocking) |
+| `gate_preset` | No | `""` | Named gate bundle (`web-app-baseline`, `enterprise-compliance`, `api-service`, `supply-chain`). Runs all gates in the preset |
+| `sticky_comment` | No | `false` | Aggregate results into a single updating PR comment. Requires `pull-requests: write` |
+| `debug` | No | `false` | Enable verbose diagnostic output |
+| `version` | No | `latest` | Evaluator version to install (e.g., `1.0.0`). `latest` uses stdlib-only evaluation |
 | `dashboard_base_url` | No | `""` | Dashboard base URL for deep links |
 | `evidence_url` | No | `""` | Explicit evidence deep link URL |
 
@@ -82,14 +92,16 @@ jobs:
 | `mode` | Detected mode: `free`, `pro`, or `enterprise` |
 | `run_id` | Pipeline run ID |
 | `major_issue_count` | Number of detected issues |
+| `observe_would_pass` | In observe mode, whether the gate would have passed. Only set when `mode: observe` |
+| `missing_evidence` | JSON array of missing evidence items `[{code, message, field_path}]` |
+| `suggested_actions` | Human-readable repair steps for failed gates |
+| `json_output` | Full evaluation result as JSON (use `fromJson()` to parse) |
 | `trace_url` | Trace URL (Pro/Enterprise) |
 | `evidence_url` | Evidence detail URL |
 | `dashboard_url` | Dashboard URL |
 | `github_run_url` | GitHub Actions run URL |
 
 ## Using Gate Results in Downstream Steps
-
-Gate outputs can drive conditional logic in your workflow:
 
 ```yaml
 - name: Evidence Gate
@@ -100,6 +112,12 @@ Gate outputs can drive conditional logic in your workflow:
     phase_id: "testing"
     evidence_files: "coverage.json"
 
+- name: Handle failure
+  if: failure()
+  run: |
+    echo "Missing: ${{ steps.gate.outputs.missing_evidence }}"
+    echo "Fix: ${{ steps.gate.outputs.suggested_actions }}"
+
 - name: Deploy (only if gate passed)
   if: steps.gate.outputs.passed == 'true'
   run: ./deploy.sh
@@ -107,7 +125,7 @@ Gate outputs can drive conditional logic in your workflow:
 
 ## Workflow Recipes
 
-Complete, copy-paste workflow files for common use cases. Each recipe includes the required `permissions` block.
+Complete, copy-paste workflow files. Each recipe includes the required `permissions` block.
 
 ### Recipe 1: Test Coverage Gate (Free Mode)
 
@@ -139,8 +157,6 @@ jobs:
 
 ### Recipe 2: Security Scan Gate
 
-Evaluate security scan results after running a SAST/DAST tool:
-
 ```yaml
 name: Security Gate
 on: [pull_request]
@@ -167,8 +183,6 @@ jobs:
 
 ### Recipe 3: Build Artifact Gate
 
-Verify that your build step produced the expected output files:
-
 ```yaml
 name: Build Gate
 on: [push]
@@ -194,8 +208,6 @@ jobs:
 ```
 
 ### Recipe 4: Multi-Gate Pipeline
-
-Run multiple gates in sequence — deploy only if all pass:
 
 ```yaml
 name: Multi-Gate Pipeline
@@ -231,9 +243,70 @@ jobs:
           evidence_files: "security-report.json"
 ```
 
-### Recipe 5: Pro Mode with Blind Gate
+### Recipe 5: Gate Preset (Multiple Gates at Once)
 
-Blind Gates hide evaluation criteria from the pipeline — the AI that generated the code cannot see or game the thresholds:
+Run a curated bundle of gates with a single input. Four presets are available: `web-app-baseline`, `enterprise-compliance`, `api-service`, `supply-chain`.
+
+```yaml
+name: Preset Gate
+on: [pull_request]
+
+jobs:
+  preset-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: pytest --cov --cov-report=json
+
+      - name: Evidence Gate (Web App Baseline)
+        uses: evidence-gate/evidence-gate-action@v1
+        with:
+          gate_preset: "web-app-baseline"
+          phase_id: "quality-check"
+          evidence_files: "coverage.json,security-report.json"
+```
+
+### Recipe 6: Observe Mode (Dry Run)
+
+Evaluate all gates without failing the workflow. Use this to measure gate pass rates before enforcing:
+
+```yaml
+name: Observe Mode
+on: [pull_request]
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: pytest --cov --cov-report=json
+
+      - name: Evidence Gate (Observe)
+        id: gate
+        uses: evidence-gate/evidence-gate-action@v1
+        with:
+          gate_type: "test_coverage"
+          phase_id: "testing"
+          evidence_files: "coverage.json"
+          mode: "observe"
+
+      - name: Check results
+        run: echo "Would have passed: ${{ steps.gate.outputs.observe_would_pass }}"
+```
+
+### Recipe 7: Pro Mode with Blind Gate
+
+Blind Gates keep evaluation criteria outside the pipeline -- the AI that generated the code cannot see or game the thresholds. The `skill` gate type is used here because skill evaluations are the primary use case for hidden criteria:
 
 ```yaml
 name: Blind Gate Evaluation
@@ -261,47 +334,71 @@ jobs:
           api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
 ```
 
-### Recipe 6: Scheduled Quality Assessment
+### Recipe 8: Sticky PR Comment (Multi-Gate Summary)
 
-Run a weekly quality check against your main branch:
+Aggregate multiple gate results into a single, auto-updating PR comment:
 
 ```yaml
-name: Weekly Quality Assessment
-on:
-  schedule:
-    - cron: "0 9 * * 1"  # Every Monday at 09:00 UTC
+name: Quality Gates with Sticky Comment
+on: [pull_request]
 
 jobs:
-  weekly-gate:
+  gates:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       checks: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run full test suite
+      - name: Run tests
         run: pytest --cov --cov-report=json
 
-      - name: Evidence Gate
+      - name: Coverage Gate
         uses: evidence-gate/evidence-gate-action@v1
         with:
-          gate_type: "release_readiness"
-          phase_id: "weekly-audit"
+          gate_type: "test_coverage"
+          phase_id: "testing"
           evidence_files: "coverage.json"
+          sticky_comment: "true"
+
+      - name: Build Gate
+        uses: evidence-gate/evidence-gate-action@v1
+        with:
+          gate_type: "build"
+          phase_id: "build"
+          evidence_files: "dist/index.js"
+          sticky_comment: "true"
 ```
 
-## How It Works
+## Why This Exists
 
-Evidence Gate operates in three modes depending on your configuration:
+When AI agents (Copilot, Claude, Cursor) generate both production code and tests, traditional CI/CD gates lose their meaning. An LLM told to "achieve 80% coverage" will produce tests that hit exactly 80.1% -- a number that satisfies the metric but proves nothing about quality.
+
+Evidence Gate addresses this with three design choices:
+
+1. **Blind Gates** -- evaluation criteria are hidden from the pipeline, so AI agents cannot reverse-engineer or optimize against them. This is the only structural solution to the gate-gaming problem in AI-driven development.
+
+2. **Evidence Trust Levels** -- every evaluation is recorded at one of four trust levels:
+   - **L1** Declaration -- the pipeline claims something happened
+   - **L2** Attestation -- a third party confirms the claim
+   - **L3** Verification -- the claim is independently reproducible
+   - **L4** Hash Chain -- SHA-256 chain that any auditor can independently verify
+
+3. **Fail-closed semantics** -- missing evidence, unreachable API, or evaluation errors mean FAIL, never a silent pass.
+
+The evidence model is designed with global regulatory frameworks in mind -- SOC 2, ISO 27001, the EU AI Act's transparency requirements, Japan's AI guidelines, and similar standards that increasingly demand verifiable records of how AI-generated code was validated. Evidence Gate does not yet cover every requirement of every framework, and regulations are still evolving. But the core architecture -- immutable evidence chains, independent verifiability, fail-closed semantics -- is built to grow with these standards.
+
+This is an open-source project under active development. We welcome feedback, contributions, and real-world use cases.
+
+## Modes
 
 | Mode | Config | What It Does |
 |------|--------|-------------|
 | **Free** | No `api_key` | Client-side evaluation: file existence, JSON validation, schema checks, numeric thresholds |
 | **Pro** | `api_key` set | Full SaaS evaluation: Blind Gate, Quality State, evidence chains (L4), remediation |
 | **Enterprise** | `api_key` + custom `api_base` | Self-hosted with the same Pro features in your own infrastructure |
-
-Free mode requires **zero external dependencies** — all checks run locally. Pro and Enterprise modes call the Evidence Gate API for advanced features.
 
 ## Free vs Pro
 
@@ -314,10 +411,14 @@ Free mode requires **zero external dependencies** — all checks run locally. Pr
 | SHA-256 integrity hashing | Yes | Yes |
 | Fail-closed error handling | Yes | Yes |
 | `GITHUB_STEP_SUMMARY` | Yes | Yes |
-| Blind Gate evaluation | — | Yes |
-| Evidence chain verification (L4) | — | Yes |
-| Quality State tracking | — | Yes |
-| Remediation workflows | — | Yes |
+| Observe mode | Yes | Yes |
+| Gate presets | Yes | Yes |
+| Sticky PR comments | Yes | Yes |
+| Structured outputs (missing_evidence, suggested_actions) | Yes | Yes |
+| Blind Gate evaluation | -- | Yes |
+| Evidence chain verification (L4) | -- | Yes |
+| Quality State tracking | -- | Yes |
+| Remediation workflows | -- | Yes |
 
 ## Troubleshooting
 
@@ -345,6 +446,7 @@ The action uses **fail-closed** semantics: any unhandled error exits non-zero. T
 ## Links
 
 - [Landing Page & Pricing](https://evidence-gate.dev)
+- [Documentation](https://evidence-gate.dev/docs/)
 - [Changelog](CHANGELOG.md)
 
 ## License
