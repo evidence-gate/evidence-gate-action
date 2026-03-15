@@ -210,22 +210,45 @@ def fail_closed_main(main_fn: Any) -> None:
     """Wrap adapter main() with fail-closed error handling.
 
     Any exception -> exit(1) to fail the CI pipeline.
+    In observe mode (EG_MODE=observe), failures are logged but do NOT exit(1).
     """
+    observe = os.environ.get("EG_MODE", "enforce").lower() == "observe"
+
     try:
         result = main_fn()
         if isinstance(result, dict):
             passed = result.get("passed", False)
             if not passed:
+                if observe:
+                    print(
+                        "EVIDENCE GATE: Quality gate FAILED "
+                        "(observe mode -- not blocking)"
+                    )
+                    return
                 print("EVIDENCE GATE: Quality gate FAILED", file=sys.stderr)
                 sys.exit(1)
             print("EVIDENCE GATE: Quality gate PASSED")
         elif result is False:
+            if observe:
+                print(
+                    "EVIDENCE GATE: Quality gate FAILED "
+                    "(observe mode -- not blocking)"
+                )
+                return
             print("EVIDENCE GATE: Quality gate FAILED", file=sys.stderr)
             sys.exit(1)
     except EvidenceGateError as exc:
+        if observe:
+            print(f"EVIDENCE GATE OBSERVE ERROR: {exc}")
+            return
         print(f"EVIDENCE GATE ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
     except Exception as exc:
+        if observe:
+            print(
+                f"EVIDENCE GATE OBSERVE UNEXPECTED: {type(exc).__name__}"
+            )
+            return
         print(
             f"EVIDENCE GATE UNEXPECTED ERROR: {type(exc).__name__}",
             file=sys.stderr,

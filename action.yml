@@ -36,6 +36,10 @@ inputs:
     description: "Explicit evidence deep link URL"
     required: false
     default: ""
+  mode:
+    description: "Execution mode: 'enforce' (default, fail on gate failure) or 'observe' (log results without blocking)"
+    required: false
+    default: "enforce"
   debug:
     description: "Enable verbose diagnostic output"
     required: false
@@ -70,6 +74,9 @@ outputs:
   mode:
     description: "Detected operational mode: free, pro, or enterprise"
     value: ${{ steps.evidence_gate.outputs.mode }}
+  observe_would_pass:
+    description: "In observe mode, whether the gate would have passed (true/false). Only set when mode input is 'observe'."
+    value: ${{ steps.evidence_gate.outputs.observe_would_pass }}
 
 runs:
   using: "composite"
@@ -99,6 +106,7 @@ runs:
       env:
         EG_API_KEY: ${{ inputs.api_key }}
         EG_API_BASE: ${{ inputs.api_base }}
+        EG_MODE: ${{ inputs.mode }}
         EG_GATE_TYPE: ${{ inputs.gate_type }}
         EG_PHASE_ID: ${{ inputs.phase_id }}
         EG_EVIDENCE_FILES: ${{ inputs.evidence_files }}

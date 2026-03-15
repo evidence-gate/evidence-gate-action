@@ -76,8 +76,13 @@ def _set_output(name: str, value: str) -> None:
         f.write(f"{name}={safe}\n")
 
 
-def _emit_annotations(issues: list[str], passed: bool) -> None:
-    level = "warning" if passed else "error"
+def _emit_annotations(
+    issues: list[str], passed: bool, *, observe_mode: bool = False
+) -> None:
+    if observe_mode:
+        level = "notice"
+    else:
+        level = "warning" if passed else "error"
     title = "Evidence Gate"
     for issue in issues[:MAX_ANNOTATIONS]:
         message = _escape_workflow_command(issue)
@@ -116,6 +121,7 @@ def _write_summary(
     github_run_url: str | None,
     dashboard_url: str | None,
     mode: str,
+    observe_mode: bool = False,
 ) -> None:
     metadata = result.get("metadata")
     metadata_dict = metadata if isinstance(metadata, dict) else {}
@@ -127,7 +133,10 @@ def _write_summary(
     evidence_url = metadata_dict.get("evidence_url")
 
     heading = _build_heading()
-    status_text = "PASS" if passed else "FAIL"
+    if observe_mode:
+        status_text = "OBSERVE (PASS)" if passed else "OBSERVE (would FAIL)"
+    else:
+        status_text = "PASS" if passed else "FAIL"
 
     # Always-visible result line
     lines = [heading, "", f"**Result:** {status_text} | **Mode:** {mode}", ""]
@@ -236,6 +245,14 @@ def main() -> dict:
         print(f"::add-mask::{api_key}")
     mode = _detect_mode(api_key)
 
+    # Observe mode detection
+    observe_mode = os.environ.get("EG_MODE", "enforce").lower() == "observe"
+    if observe_mode:
+        print(
+            "::notice title=Evidence Gate::"
+            "Running in observe mode -- failures will not block this step"
+        )
+
     # Debug logging (DX-03)
     debug = os.environ.get("EG_DEBUG", "false").lower() == "true"
     if debug:
@@ -326,8 +343,9 @@ def main() -> dict:
         github_run_url=github_run_url,
         dashboard_url=dashboard_url,
         mode=mode,
+        observe_mode=observe_mode,
     )
-    _emit_annotations(issue_list, passed=passed)
+    _emit_annotations(issue_list, passed=passed, observe_mode=observe_mode)
 
     _set_output("passed", str(passed).lower())
     _set_output("mode", mode)
@@ -337,6 +355,8 @@ def main() -> dict:
     _set_output("dashboard_url", dashboard_url or "")
     _set_output("github_run_url", github_run_url or "")
     _set_output("major_issue_count", str(len(issue_list)))
+    if observe_mode:
+        _set_output("observe_would_pass", str(passed).lower())
 
     return result
 
