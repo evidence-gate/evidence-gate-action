@@ -952,3 +952,133 @@ class TestMissingEvidence:
         assert match is not None
         parsed = json.loads(match.group(2))
         assert parsed == []
+
+
+class TestSuggestedActions:
+    """FEAT-03: suggested_actions output for human-readable repair steps."""
+
+    def test_suggested_actions_security_issue(self) -> None:
+        """Security gate with security issue returns security repair action."""
+        result = {
+            "passed": False,
+            "issues": [],
+            "structured_issues": [
+                {"code": "SECURITY_SCAN_DETECTED", "message": "Vulnerability found"},
+            ],
+        }
+        actions = entrypoint._generate_suggested_actions("security", result)
+        assert len(actions) >= 1
+        assert any("patch vulnerabilities" in a.lower() for a in actions)
+
+    def test_suggested_actions_coverage_issue(self) -> None:
+        """Coverage gate with coverage issue returns test improvement action."""
+        result = {
+            "passed": False,
+            "issues": [],
+            "structured_issues": [
+                {"code": "COVERAGE_BELOW_THRESHOLD", "message": "Coverage at 45%"},
+            ],
+        }
+        actions = entrypoint._generate_suggested_actions("test_coverage", result)
+        assert len(actions) >= 1
+        assert any("add tests" in a.lower() for a in actions)
+
+    def test_suggested_actions_missing_evidence(self) -> None:
+        """Gate with missing evidence issue returns evidence provision action."""
+        result = {
+            "passed": False,
+            "issues": [],
+            "structured_issues": [
+                {"code": "MISSING_EVIDENCE_FILE", "message": "No evidence file"},
+            ],
+        }
+        actions = entrypoint._generate_suggested_actions("skill", result)
+        assert len(actions) >= 1
+        assert any("provide required evidence" in a.lower() for a in actions)
+
+    def test_suggested_actions_fallback_on_unknown_issue(self) -> None:
+        """Unknown gate/issue combination returns at least one action (fallback)."""
+        result = {
+            "passed": False,
+            "issues": [],
+            "structured_issues": [
+                {"code": "TOTALLY_UNKNOWN_CODE", "message": "Something weird"},
+            ],
+        }
+        actions = entrypoint._generate_suggested_actions("custom", result)
+        assert len(actions) >= 1
+
+    def test_suggested_actions_empty_on_pass(self) -> None:
+        """Passing result returns empty list."""
+        result = {"passed": True, "issues": [], "metadata": {}}
+        actions = entrypoint._generate_suggested_actions("skill", result)
+        assert actions == []
+
+    def test_suggested_actions_from_plain_issues_keyword(self) -> None:
+        """Plain issue text triggers keyword extraction for matching."""
+        result = {
+            "passed": False,
+            "issues": ["vulnerability found in dependency"],
+        }
+        actions = entrypoint._generate_suggested_actions("security", result)
+        assert len(actions) >= 1
+        assert any("vulnerabilit" in a.lower() or "patch" in a.lower() for a in actions)
+
+    def test_suggested_actions_deduplication(self) -> None:
+        """Multiple issues matching same action_id produce deduplicated output."""
+        result = {
+            "passed": False,
+            "issues": [],
+            "structured_issues": [
+                {"code": "SECURITY_SCAN_HIGH", "message": "High vuln"},
+                {"code": "SECURITY_SCAN_CRITICAL", "message": "Critical vuln"},
+            ],
+        }
+        actions = entrypoint._generate_suggested_actions("security", result)
+        # Both match the same action_id, so should be deduplicated
+        action_texts = [a for a in actions if "patch" in a.lower()]
+        assert len(action_texts) == 1
+
+    def test_suggested_actions_sorted_by_priority(self) -> None:
+        """Actions are sorted high > medium > low."""
+        result = {
+            "passed": False,
+            "issues": [],
+            "structured_issues": [
+                {"code": "TOTALLY_UNKNOWN", "message": "Unknown issue"},  # low (fallback)
+                {"code": "MISSING_EVIDENCE_FILE", "message": "No evidence"},  # high
+            ],
+        }
+        actions = entrypoint._generate_suggested_actions("custom", result)
+        assert len(actions) >= 2
+        # high should come before low
+        high_idx = next(i for i, a in enumerate(actions) if "high" in a.lower())
+        low_idx = next(i for i, a in enumerate(actions) if "low" in a.lower())
+        assert high_idx < low_idx
+
+    def test_suggested_actions_output_in_github_output(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """main() sets suggested_actions in GITHUB_OUTPUT on failure."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {
+                "passed": False,
+                "issues": ["Evidence missing for gate"],
+                "metadata": {},
+            }
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        output_text = output.read_text()
+        assert "suggested_actions<<ghadelimiter_" in output_text
