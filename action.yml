@@ -1,5 +1,5 @@
 name: "Evidence Gate Action"
-description: "Fail-closed quality gates for CI/CD pipelines. 25 gate types, tamper-proof evidence chains, and Blind Gate anti-gaming. Free forever for open-source."
+description: "Fail-closed quality gates for CI/CD. 25 gate types, tamper-proof evidence chains, Blind Gate anti-gaming. Free for OSS."
 author: "evidence-gate"
 
 branding:
