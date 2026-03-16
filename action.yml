@@ -97,6 +97,9 @@ outputs:
   suggested_actions:
     description: "Human-readable repair steps for failed gates"
     value: ${{ steps.evidence_gate.outputs.suggested_actions }}
+  retry_prompt:
+    description: "Machine-readable remediation instructions for AI agent auto-repair. Empty string when gate passed. Format: GATE/PHASE/STATUS/ISSUES/REMEDIATION/RETRY sections."
+    value: ${{ steps.evidence_gate.outputs.retry_prompt }}
   json_output:
     description: "Full evaluation result as JSON string (use fromJson() to parse)"
     value: ${{ steps.evidence_gate.outputs.json_output }}
