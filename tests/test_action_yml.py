@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 ACTION_YML_PATH = Path(__file__).resolve().parent.parent / "action.yml"
+README_PATH = Path(__file__).resolve().parent.parent / "README.md"
 
 # ---------------------------------------------------------------------------
 # Helper: load YAML (pyyaml preferred, regex fallback)
@@ -143,4 +144,60 @@ class TestConfigFileInput:
         raw = _load_raw()
         assert "pyyaml" in raw.lower(), (
             "action.yml must contain a 'pip install pyyaml' step (Pitfall 1 from RESEARCH.md)"
+        )
+
+
+class TestREADMEStructure:
+    """README Solutions Catalog structure contract tests -- MKTPL-01, MKTPL-02, MKTPL-03."""
+
+    def test_readme_has_solutions_section(self) -> None:
+        """README must have Solutions Catalog structure (MKTPL-01).
+
+        Each section must start with a use-case heading (outcome-first, not feature-first).
+        Acceptable: '## Solutions' section OR presence of specific use-case headings.
+        """
+        content = README_PATH.read_text(encoding="utf-8")
+        has_solutions_section = "## Solutions" in content
+        has_usecase_headings = any(
+            heading in content
+            for heading in [
+                "Enforce test coverage",
+                "Block PRs without",
+                "Prevent AI agents",
+                "Validate SBOM",
+            ]
+        )
+        assert has_solutions_section or has_usecase_headings, (
+            "README must have Solutions Catalog structure: "
+            "either '## Solutions' section or use-case headings like "
+            "'Enforce test coverage', 'Block PRs without', 'Prevent AI agents'"
+        )
+
+    def test_readme_has_visual_proof(self) -> None:
+        """README must contain a Visual Proof section with Check Run and Job Summary examples (MKTPL-02).
+
+        Acceptable: a dedicated '## Visual Proof' or '## Output Examples' section
+        that demonstrates both Check Run annotations and Job Summary table.
+        Must be a dedicated section, not just incidental mentions in other tables.
+        """
+        content = README_PATH.read_text(encoding="utf-8")
+        has_visual_section = (
+            "## Visual Proof" in content or "## Output Examples" in content
+        )
+        assert has_visual_section, (
+            "README must contain a dedicated Visual Proof section "
+            "(either '## Visual Proof' or '## Output Examples') "
+            "showing Check Run output and Job Summary examples"
+        )
+
+    def test_readme_has_migration_guide(self) -> None:
+        """README must contain a Migration Guide section (MKTPL-03).
+
+        Must cover v1.0.x -> v1.1.0 upgrade path with breaking changes and checklist.
+        """
+        content = README_PATH.read_text(encoding="utf-8")
+        has_migration = "## Migrating from" in content or "## Migration Guide" in content
+        assert has_migration, (
+            "README must contain a Migration Guide section. "
+            "Expected '## Migrating from' or '## Migration Guide'"
         )
