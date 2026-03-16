@@ -71,8 +71,8 @@ jobs:
 
 | Input | Required | Default | Description |
 |-------|:--------:|---------|-------------|
-| `gate_type` | **Yes** | -- | Gate type to evaluate (e.g., `test_coverage`, `security`, `build`, `skill`) |
-| `phase_id` | **Yes** | -- | Phase identifier (e.g., `build`, `test`, `deploy`) |
+| `gate_type` | No | `""` | Gate type to evaluate (e.g., `test_coverage`, `security`, `build`, `skill`). Optional if `.evidencegate.yml` is present |
+| `phase_id` | No | `""` | Phase identifier (e.g., `build`, `test`, `deploy`). Optional if `.evidencegate.yml` is present |
 | `evidence_files` | No | `""` | Comma-separated list of evidence file paths |
 | `api_key` | No | `""` | Evidence Gate API key. Omit for Free mode |
 | `api_base` | No | `https://api.evidence-gate.dev` | API base URL. Change for self-hosted Enterprise |
@@ -95,6 +95,7 @@ jobs:
 | `observe_would_pass` | In observe mode, whether the gate would have passed. Only set when `mode: observe` |
 | `missing_evidence` | JSON array of missing evidence items `[{code, message, field_path}]` |
 | `suggested_actions` | Human-readable repair steps for failed gates |
+| `retry_prompt` | Machine-readable repair instructions for AI agents. Empty string when gate passes |
 | `json_output` | Full evaluation result as JSON (use `fromJson()` to parse) |
 | `trace_url` | Trace URL (Pro/Enterprise) |
 | `evidence_url` | Evidence detail URL |
@@ -123,11 +124,11 @@ jobs:
   run: ./deploy.sh
 ```
 
-## Workflow Recipes
+## Solutions
 
 Complete, copy-paste workflow files. Each recipe includes the required `permissions` block.
 
-### Recipe 1: Test Coverage Gate (Free Mode)
+### Enforce test coverage on every PR
 
 No API key needed. Validates that your test suite produced coverage evidence:
 
@@ -155,7 +156,7 @@ jobs:
           evidence_files: "coverage.json"
 ```
 
-### Recipe 2: Security Scan Gate
+### Block PRs without a security scan
 
 ```yaml
 name: Security Gate
@@ -181,7 +182,7 @@ jobs:
           evidence_files: "security-report.json"
 ```
 
-### Recipe 3: Build Artifact Gate
+### Require build artifacts before deploy
 
 ```yaml
 name: Build Gate
@@ -207,7 +208,7 @@ jobs:
           evidence_files: "dist/index.js,dist/index.css"
 ```
 
-### Recipe 4: Multi-Gate Pipeline
+### Run multiple quality checks in sequence
 
 ```yaml
 name: Multi-Gate Pipeline
@@ -243,7 +244,7 @@ jobs:
           evidence_files: "security-report.json"
 ```
 
-### Recipe 5: Gate Preset (Multiple Gates at Once)
+### Use a curated gate bundle (zero decision paralysis)
 
 Run a curated bundle of gates with a single input. Four presets are available: `web-app-baseline`, `enterprise-compliance`, `api-service`, `supply-chain`.
 
@@ -271,7 +272,7 @@ jobs:
           evidence_files: "coverage.json,security-report.json"
 ```
 
-### Recipe 6: Observe Mode (Dry Run)
+### Measure gate pass rates before enforcing
 
 Evaluate all gates without failing the workflow. Use this to measure gate pass rates before enforcing:
 
@@ -304,7 +305,7 @@ jobs:
         run: echo "Would have passed: ${{ steps.gate.outputs.observe_would_pass }}"
 ```
 
-### Recipe 7: Pro Mode with Blind Gate
+### Prevent AI agents from gaming your quality metrics
 
 Blind Gates keep evaluation criteria outside the pipeline -- the AI that generated the code cannot see or game the thresholds. The `skill` gate type is used here because skill evaluations are the primary use case for hidden criteria:
 
@@ -334,7 +335,7 @@ jobs:
           api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
 ```
 
-### Recipe 8: Sticky PR Comment (Multi-Gate Summary)
+### Aggregate all gate results in one PR comment
 
 Aggregate multiple gate results into a single, auto-updating PR comment:
 
@@ -371,6 +372,59 @@ jobs:
           evidence_files: "dist/index.js"
           sticky_comment: "true"
 ```
+
+### Configure from a repo file (no workflow inputs needed)
+
+Add `.evidencegate.yml` to your repository root and run the action with zero inputs:
+
+```yaml
+# .evidencegate.yml
+gate_type: test_coverage
+phase_id: testing
+mode: enforce
+evidence_files:
+  - coverage.json
+```
+
+```yaml
+# .github/workflows/gate.yml — no inputs needed
+name: Evidence Gate
+on: [pull_request]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: pytest --cov --cov-report=json
+      - uses: evidence-gate/evidence-gate-action@v1
+```
+
+### Validate SBOM and build provenance
+
+Verify supply chain security artifacts as part of your release pipeline:
+
+```yaml
+name: Supply Chain Gate
+on: [push]
+jobs:
+  supply-chain:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: evidence-gate/evidence-gate-action@v1
+        with:
+          gate_type: "sbom"
+          phase_id: "release"
+          evidence_files: "sbom.cdx.json"
+```
+
+Use `gate_type: "provenance"` for build provenance attestation. Both gate types are available in Free mode.
 
 ## Why This Exists
 
