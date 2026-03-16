@@ -1268,3 +1268,77 @@ class TestStickyComment:
         captured = capsys.readouterr()
         assert "::warning title=Evidence Gate::" in captured.out
         assert "no PR context" in captured.out
+
+
+class TestConfigFileIntegration:
+    """Integration tests for config-file-driven main() -- CONFIG-01, CONFIG-03.
+
+    These tests are RED until Plan 03 wires config_loader into entrypoint.main().
+    """
+
+    def test_main_succeeds_with_config_file_zero_inputs(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """CONFIG-01: main() succeeds when .evidencegate.yml provides gate_type + phase_id."""
+        config_file = tmp_path / ".evidencegate.yml"
+        config_file.write_text("gate_type: test_coverage\nphase_id: ci\n")
+
+        output = tmp_path / "output.txt"
+        monkeypatch.setenv("GITHUB_WORKSPACE", str(tmp_path))
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.delenv("EG_GATE_TYPE", raising=False)
+        monkeypatch.delenv("EG_PHASE_ID", raising=False)
+        monkeypatch.delenv("EG_API_KEY", raising=False)
+
+        monkeypatch.setattr(
+            entrypoint, "evaluate_local",
+            lambda **kwargs: {"passed": True, "issues": []},
+        )
+
+        result = entrypoint.main()
+        assert result.get("passed") is True
+
+    def test_explicit_input_wins_over_config_file(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """CONFIG-03: explicit action input takes precedence over config file value."""
+        config_file = tmp_path / ".evidencegate.yml"
+        config_file.write_text("gate_type: from_config\nphase_id: ci\n")
+
+        output = tmp_path / "output.txt"
+        monkeypatch.setenv("GITHUB_WORKSPACE", str(tmp_path))
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("EG_GATE_TYPE", "explicit_type")  # explicit wins
+        monkeypatch.setenv("EG_PHASE_ID", "ci")
+        monkeypatch.delenv("EG_API_KEY", raising=False)
+
+        seen_gate_types: list[str] = []
+
+        def _capture_local(**kwargs):
+            seen_gate_types.append(kwargs.get("gate_type", ""))
+            return {"passed": True, "issues": []}
+
+        monkeypatch.setattr(entrypoint, "evaluate_local", _capture_local)
+
+        entrypoint.main()
+        assert seen_gate_types == ["explicit_type"], (
+            f"Expected gate_type='explicit_type' (explicit input wins), "
+            f"got {seen_gate_types}"
+        )
+
+    def test_main_exits_with_error_when_no_gate_type_in_config_or_input(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """CONFIG-01: main() exits(1) when neither config nor input provides gate_type."""
+        config_file = tmp_path / ".evidencegate.yml"
+        config_file.write_text("phase_id: ci\n")  # no gate_type
+
+        monkeypatch.setenv("GITHUB_WORKSPACE", str(tmp_path))
+        monkeypatch.delenv("EG_GATE_TYPE", raising=False)
+        monkeypatch.delenv("EG_PHASE_ID", raising=False)
+        monkeypatch.delenv("EG_GATE_PRESET", raising=False)
+        monkeypatch.delenv("EG_API_KEY", raising=False)
+
+        with pytest.raises(SystemExit) as exc_info:
+            entrypoint.main()
+        assert exc_info.value.code == 1

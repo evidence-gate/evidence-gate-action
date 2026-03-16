@@ -110,3 +110,37 @@ class TestActionYml:
         assert "pip install" in raw, (
             "action.yml must contain a 'pip install' step for version pinning"
         )
+
+
+class TestConfigFileInput:
+    """Contract tests for config_path input -- CONFIG-05."""
+
+    def test_config_path_input_exists(self) -> None:
+        """config_path input must exist in action.yml."""
+        data = _load_action()
+        assert "config_path" in data["inputs"], (
+            f"'config_path' not in inputs: {list(data['inputs'].keys())}. "
+            "Add config_path input for CONFIG-05."
+        )
+
+    def test_config_path_input_is_optional(self) -> None:
+        """config_path input must be optional with empty default."""
+        data = _load_action()
+        assert "config_path" in data["inputs"], "config_path input missing"
+        cp = data["inputs"]["config_path"]
+        assert cp.get("required", True) is False, "config_path must be required: false"
+        assert cp.get("default", None) == "", "config_path default must be empty string"
+
+    def test_eg_config_path_env_var_in_run_step(self) -> None:
+        """EG_CONFIG_PATH env var must be wired in the Run Evidence Gate step."""
+        raw = _load_raw()
+        assert "EG_CONFIG_PATH" in raw, (
+            "EG_CONFIG_PATH env var must be in 'Run Evidence Gate' step env block"
+        )
+
+    def test_pyyaml_install_step_exists(self) -> None:
+        """action.yml must install pyyaml before the evaluator runs."""
+        raw = _load_raw()
+        assert "pyyaml" in raw.lower(), (
+            "action.yml must contain a 'pip install pyyaml' step (Pitfall 1 from RESEARCH.md)"
+        )
