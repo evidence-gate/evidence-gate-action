@@ -426,6 +426,36 @@ jobs:
 
 Use `gate_type: "provenance"` for build provenance attestation. Both gate types are available in Free mode.
 
+## Visual Proof
+
+<!-- TODO: replace with screenshot once action runs in a live GitHub Actions environment -->
+
+### Check Run Annotations
+
+When a gate fails, findings appear inline in the **Files Changed** tab of your PR:
+
+```
+::error file=src/app.py,line=1::test_coverage gate FAILED — coverage 72% < threshold 80%
+::warning file=coverage.json::Evidence file found but threshold not met
+::notice ::Suggested action: increase test coverage by 8 percentage points
+```
+
+Annotations are visible without leaving GitHub. `::error` creates a blocking review, `::warning` flags the file, `::notice` adds context.
+
+<!-- TODO: replace with screenshot -->
+
+### Job Summary
+
+Every run appends a structured summary to `GITHUB_STEP_SUMMARY` (visible in the Actions UI under the Summary tab):
+
+| Signal | Gate | Result | Details |
+|--------|------|--------|---------|
+| CRITICAL | test_coverage | FAILED | coverage 72% < 80% threshold |
+| WARNING | security | WARN | 2 medium-severity findings |
+| INFO | build | PASSED | dist/index.js present (124 KB) |
+
+Results are sorted by signal hierarchy: Critical > Warning > Info. Use this view to triage failures without digging through logs.
+
 ## Why This Exists
 
 When AI agents (Copilot, Claude, Cursor) generate both production code and tests, traditional CI/CD gates lose their meaning. An LLM told to "achieve 80% coverage" will produce tests that hit exactly 80.1% -- a number that satisfies the metric but proves nothing about quality.
