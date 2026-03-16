@@ -1541,3 +1541,105 @@ class TestSignalHierarchy:
 
         summary_text = summary.read_text()
         assert "| Critical |" in summary_text
+
+
+class TestRetryPrompt:
+    """FEAT-03: _build_retry_prompt for machine-readable remediation output.
+
+    All tests are RED until Wave 3 implements _build_retry_prompt in entrypoint.py.
+    """
+
+    def test_retry_prompt_empty_on_pass(self) -> None:
+        """Passing result produces empty retry_prompt."""
+        result = entrypoint._build_retry_prompt(
+            "sbom", "1a", {"passed": True, "issues": []}
+        )
+        assert result == ""
+
+    def test_retry_prompt_structure_on_failure(self) -> None:
+        """Failing result produces structured retry_prompt with required sections."""
+        result = entrypoint._build_retry_prompt(
+            "sbom",
+            "2b",
+            {"passed": False, "issues": ["File not found: sbom.json"]},
+        )
+        assert "GATE: sbom" in result
+        assert "PHASE: 2b" in result
+        assert "STATUS: FAILED" in result
+        assert "ISSUES:" in result
+        assert "REMEDIATION:" in result
+        assert "RETRY:" in result
+
+    def test_retry_prompt_written_to_output(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """main() writes retry_prompt to GITHUB_OUTPUT on failure."""
+        import re
+
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {
+                "passed": False,
+                "issues": ["Evidence missing for gate"],
+                "metadata": {},
+            }
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        output_text = output.read_text()
+        assert "retry_prompt" in output_text
+
+    def test_retry_prompt_preset_aggregation(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """In preset mode, aggregated retry_prompt includes both gates' issues."""
+        import re
+
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_PRESET", "web-app-baseline")
+        monkeypatch.setenv("EG_GATE_TYPE", "")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+        monkeypatch.delenv("EG_STICKY_COMMENT", raising=False)
+
+        eval_count = {"n": 0}
+
+        def _fake_evaluate(**kwargs):
+            eval_count["n"] += 1
+            if eval_count["n"] in (1, 3):
+                return {
+                    "passed": False,
+                    "issues": [f"Issue from gate {eval_count['n']}"],
+                    "metadata": {},
+                }
+            return {"passed": True, "issues": [], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        output_text = output.read_text()
+        # Aggregated retry_prompt should reference issues from both failing gates
+        match = re.search(
+            r"retry_prompt<<(ghadelimiter_\w+)\n(.*?)\n\1\n",
+            output_text,
+            re.DOTALL,
+        )
+        assert match is not None, "retry_prompt output not found in GITHUB_OUTPUT"
+        prompt_text = match.group(2)
+        assert "Issue from gate 1" in prompt_text or "gate 1" in prompt_text.lower()
+        assert "Issue from gate 3" in prompt_text or "gate 3" in prompt_text.lower()
