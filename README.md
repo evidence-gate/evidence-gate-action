@@ -456,6 +456,64 @@ Every run appends a structured summary to `GITHUB_STEP_SUMMARY` (visible in the 
 
 Results are sorted by signal hierarchy: Critical > Warning > Info. Use this view to triage failures without digging through logs.
 
+## Migrating from v1.0.x to v1.1.0
+
+v1.1.0 is **backwards-compatible** for most users. Existing workflows continue to work without changes.
+
+### The one breaking change: API base URL
+
+If you use self-hosted Enterprise with a custom `api_base`, no action is needed -- your custom URL overrides the default.
+
+If you previously relied on the **default URL** `https://api.evidence-gate.com`, it has changed to `https://api.evidence-gate.dev`. Free and Pro users are unaffected -- the default URL change happens automatically.
+
+### Before / After
+
+**Before (v1.0.x) -- still works in v1.1.0:**
+
+```yaml
+- uses: evidence-gate/evidence-gate-action@v1
+  with:
+    gate_type: "test_coverage"   # was required; now optional if config file present
+    phase_id: "testing"          # was required; now optional if config file present
+    evidence_files: "coverage.json"
+```
+
+**After (v1.1.0) with config file (optional upgrade):**
+
+```yaml
+# .evidencegate.yml in your repo root
+gate_type: test_coverage
+phase_id: testing
+evidence_files:
+  - coverage.json
+
+# workflow — zero inputs needed
+- uses: evidence-gate/evidence-gate-action@v1
+```
+
+### New Capabilities in v1.1.0
+
+| Feature | How to Use | Notes |
+|---------|-----------|-------|
+| Config file | Add `.evidencegate.yml` | Zero required inputs |
+| Warn mode | `mode: warn` | Gate fails but step succeeds |
+| Observe mode | `mode: observe` | Shadow run -- outputs `observe_would_pass` |
+| Gate presets | `gate_preset: web-app-baseline` | Runs 4 gates at once |
+| Sticky PR comment | `sticky_comment: true` | Single updating comment |
+| AI repair contract | output `retry_prompt` | Machine-readable fix instructions for AI agents |
+| SBOM gate | `gate_type: sbom` | CycloneDX/SPDX validation (Free) |
+| Provenance gate | `gate_type: provenance` | Build attestation check (Free) |
+| Check Run annotations | automatic | Findings appear inline in Files Changed tab |
+| Signal-sorted Job Summary | automatic | Critical > Warning > Info |
+
+### Migration Checklist
+
+- [ ] Verify existing workflows still pass (most users: no action required)
+- [ ] If using self-hosted Enterprise: confirm `api_base` URL is still correct
+- [ ] Optional: add `.evidencegate.yml` to your repo for zero-input usage
+- [ ] Optional: add `mode: warn` to non-critical gates for gradual rollout
+- [ ] Optional: add `sticky_comment: true` to aggregate PR feedback
+
 ## Why This Exists
 
 When AI agents (Copilot, Claude, Cursor) generate both production code and tests, traditional CI/CD gates lose their meaning. An LLM told to "achieve 80% coverage" will produce tests that hit exactly 80.1% -- a number that satisfies the metric but proves nothing about quality.
