@@ -1342,3 +1342,142 @@ class TestConfigFileIntegration:
         with pytest.raises(SystemExit) as exc_info:
             entrypoint.main()
         assert exc_info.value.code == 1
+
+
+class TestWarnMode:
+    """QUAL-04: warn mode -- gate failure does not block step, emits warnings.
+
+    These tests are RED until Plan 02 wires warn_mode into entrypoint.main().
+    """
+
+    def test_warn_mode_step_succeeds_when_gate_fails(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """EG_MODE=warn with gate failure does NOT raise SystemExit."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "warn")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["coverage below threshold"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        # warn mode: should NOT raise SystemExit even when gate fails
+        fail_closed_main(entrypoint.main)
+
+        output_text = output.read_text()
+        assert "passed=true" in output_text
+
+    def test_warn_mode_does_not_set_observe_would_pass(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """EG_MODE=warn output does NOT contain observe_would_pass."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "warn")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["coverage below threshold"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        fail_closed_main(entrypoint.main)
+
+        output_text = output.read_text()
+        assert "observe_would_pass" not in output_text
+
+    def test_warn_mode_notice_emitted(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys
+    ) -> None:
+        """EG_MODE=warn with failure emits ::notice with 'warn mode' message."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "warn")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["coverage below threshold"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        fail_closed_main(entrypoint.main)
+
+        captured = capsys.readouterr()
+        assert "::notice" in captured.out
+        assert "warn" in captured.out.lower()
+
+    def test_warn_mode_summary_shows_warn_badge(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """EG_MODE=warn with failure shows WARN badge in step summary."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "warn")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["coverage below threshold"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        fail_closed_main(entrypoint.main)
+
+        summary_text = summary.read_text()
+        assert "WARN" in summary_text
+
+
+class TestAnnotationLevels:
+    """QUAL-02: severity-classified annotations via _emit_annotations.
+
+    Tests verify existing behavior for passed/failed/observe levels,
+    plus RED test for warn_mode param that does not yet exist.
+    """
+
+    def test_annotation_levels_direct_call_passed_uses_warning(self, capsys) -> None:
+        """_emit_annotations with passed=True uses ::warning level."""
+        entrypoint._emit_annotations(["minor issue"], passed=True)
+        captured = capsys.readouterr()
+        assert "::warning" in captured.out
+
+    def test_annotation_levels_direct_call_failed_uses_error(self, capsys) -> None:
+        """_emit_annotations with passed=False uses ::error level."""
+        entrypoint._emit_annotations(["coverage below threshold"], passed=False)
+        captured = capsys.readouterr()
+        assert "::error" in captured.out
+
+    def test_annotation_levels_observe_uses_notice(self, capsys) -> None:
+        """_emit_annotations with observe_mode=True uses ::notice level."""
+        entrypoint._emit_annotations(["issue"], passed=False, observe_mode=True)
+        captured = capsys.readouterr()
+        assert "::notice" in captured.out
+
+    def test_annotation_levels_warn_mode_uses_warning(self, capsys) -> None:
+        """_emit_annotations with warn_mode=True uses ::warning (not ::error).
+
+        RED: This test MUST FAIL until Plan 02 adds warn_mode param to _emit_annotations.
+        Calling with warn_mode=True raises TypeError (unexpected keyword argument).
+        """
+        entrypoint._emit_annotations(
+            ["coverage below threshold"], passed=False, warn_mode=True
+        )
+        captured = capsys.readouterr()
+        assert "::warning" in captured.out
