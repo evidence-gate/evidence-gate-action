@@ -43,7 +43,7 @@ inputs:
     required: false
     default: ""
   mode:
-    description: "Execution mode: 'enforce' (default, fail on gate failure) or 'observe' (log results without blocking)"
+    description: "Enforcement mode: 'enforce' (default, fail on gate failure), 'warn' (emit warnings but step succeeds), or 'observe' (shadow mode, log results without blocking)"
     required: false
     default: "enforce"
   debug:
