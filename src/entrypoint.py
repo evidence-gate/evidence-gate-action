@@ -173,6 +173,37 @@ _KEYWORD_PATTERNS: list[tuple[str, str]] = [
 
 _PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
+# Signal hierarchy classification (QUAL-05)
+_CRITICAL_KEYWORDS = frozenset({"fail", "error", "critical", "vulner", "missing", "not found"})
+_WARNING_KEYWORDS = frozenset({"warn", "below", "threshold", "coverage", "deprecated"})
+_SEVERITY_ORDER = {"Critical": 0, "Warning": 1, "Info": 2}
+
+
+def _classify_severity(issue: str) -> str:
+    """Return 'Critical', 'Warning', or 'Info' for a plain-text issue string."""
+    lower = issue.lower()
+    if any(k in lower for k in _CRITICAL_KEYWORDS):
+        return "Critical"
+    if any(k in lower for k in _WARNING_KEYWORDS):
+        return "Warning"
+    return "Info"
+
+
+def _write_issues_table(issues: list[str], lines: list[str]) -> list[str]:
+    """Append a signal-hierarchy-sorted issues table to lines.
+
+    Issues are classified by _classify_severity and sorted Critical > Warning > Info.
+    Modifies lines in-place and returns lines for convenience.
+    """
+    if not issues:
+        return lines
+    classified = [(i, _classify_severity(i)) for i in issues]
+    classified.sort(key=lambda x: _SEVERITY_ORDER[x[1]])
+    lines.extend(["", "| Severity | Issue |", "|----------|-------|"])
+    for issue, severity in classified:
+        lines.append(f"| {severity} | {issue} |")
+    return lines
+
 
 def _extract_issue_code(issue_text: str) -> str:
     """Extract synthetic issue code from plain text using keyword patterns."""
@@ -320,10 +351,8 @@ def _write_summary(
         lines.append("")
         lines.append("</details>")
 
-    # Major issues (always visible, outside details)
-    if major_issues:
-        lines.extend(["", "### Major Issues"])
-        lines.extend(f"- {issue}" for issue in major_issues)
+    # Signal hierarchy issues table (always visible, outside details) -- QUAL-05
+    _write_issues_table(major_issues, lines)
 
     _append_summary("\n".join(lines))
 
