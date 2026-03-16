@@ -64,3 +64,35 @@ jobs:
           # Action should not fail (exit 0) even for Pro-only gate type
           # The upsell is informational, not a failure
           echo "Pro feature upsell integration test: PASS"
+
+  test-warn-mode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Run Evidence Gate in warn mode (evidence file missing = gate fails)
+        uses: ./
+        id: gate
+        with:
+          gate_type: "file_check"
+          phase_id: "test"
+          evidence_files: "nonexistent_evidence_file_that_does_not_exist.json"
+          mode: "warn"
+        # No continue-on-error -- step MUST exit 0 because warn mode overrides exit code
+
+      - name: Verify warn mode step succeeded and passed=true
+        run: |
+          echo "passed=${{ steps.gate.outputs.passed }}"
+          echo "mode=${{ steps.gate.outputs.mode }}"
+
+          if [ "${{ steps.gate.outputs.passed }}" != "true" ]; then
+            echo "::error::Warn mode must set passed=true even when gate fails"
+            exit 1
+          fi
+
+          if [ "${{ steps.gate.outputs.mode }}" != "free" ]; then
+            echo "::error::Expected mode=free (operational mode), got ${{ steps.gate.outputs.mode }}"
+            exit 1
+          fi
+
+          echo "warn mode integration test: PASS"
