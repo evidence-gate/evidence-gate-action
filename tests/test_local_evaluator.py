@@ -341,3 +341,178 @@ class TestEvaluateLocal:
             checks={"required_files": ["/nonexistent/required.json"]},
         )
         assert result["passed"] is False
+
+
+# ---------------------------------------------------------------------------
+# SBOM gate (FEAT-01) -- RED until Wave 2 implements evaluate_sbom
+# ---------------------------------------------------------------------------
+
+
+class TestSBOMGate:
+    """Test SBOM validation via evaluate_local(gate_type='sbom').
+
+    All tests are RED until Wave 2 implements SBOM handling in local_evaluator.
+    """
+
+    def test_valid_cyclonedx_json_passes(self, tmp_path) -> None:
+        """Minimal CycloneDX 1.6 SBOM passes validation."""
+        sbom = tmp_path / "sbom-cyclonedx.json"
+        sbom.write_text(json.dumps({
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "components": [
+                {"type": "library", "name": "requests", "version": "2.31.0"},
+            ],
+        }))
+        result = evaluate_local(
+            gate_type="sbom", phase_id="1a", evidence_files=[str(sbom)]
+        )
+        assert result["passed"] is True
+        assert result["issues"] == []
+
+    def test_valid_spdx_json_passes(self, tmp_path) -> None:
+        """Minimal SPDX 2.3 SBOM passes validation."""
+        sbom = tmp_path / "sbom-spdx.json"
+        sbom.write_text(json.dumps({
+            "SPDXID": "SPDXRef-DOCUMENT",
+            "spdxVersion": "SPDX-2.3",
+            "creationInfo": {
+                "created": "2026-01-01T00:00:00Z",
+                "creators": ["Tool: test"],
+            },
+            "name": "test-sbom",
+            "dataLicense": "CC0-1.0",
+            "documentNamespace": "https://example.com/test",
+            "packages": [
+                {
+                    "SPDXID": "SPDXRef-Pkg",
+                    "name": "pkg",
+                    "downloadLocation": "NOASSERTION",
+                    "filesAnalyzed": False,
+                },
+            ],
+            "relationships": [],
+        }))
+        result = evaluate_local(
+            gate_type="sbom", phase_id="1a", evidence_files=[str(sbom)]
+        )
+        assert result["passed"] is True
+        assert result["issues"] == []
+
+    def test_missing_file_fails(self) -> None:
+        """Non-existent SBOM file fails with issues."""
+        result = evaluate_local(
+            gate_type="sbom",
+            phase_id="1a",
+            evidence_files=["/nonexistent/sbom.json"],
+        )
+        assert result["passed"] is False
+        assert len(result["issues"]) > 0
+
+    def test_unrecognized_format_fails(self, tmp_path) -> None:
+        """JSON without SBOM fields fails with 'unrecognized' or 'format' message."""
+        sbom = tmp_path / "not-sbom.json"
+        sbom.write_text(json.dumps({"hello": "world"}))
+        result = evaluate_local(
+            gate_type="sbom", phase_id="1a", evidence_files=[str(sbom)]
+        )
+        assert result["passed"] is False
+        assert any(
+            "unrecognized" in issue.lower() or "format" in issue.lower()
+            for issue in result["issues"]
+        )
+
+    def test_empty_components_warns(self, tmp_path) -> None:
+        """CycloneDX with empty components passes but emits warning."""
+        sbom = tmp_path / "sbom-empty-components.json"
+        sbom.write_text(json.dumps({
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "components": [],
+        }))
+        result = evaluate_local(
+            gate_type="sbom", phase_id="1a", evidence_files=[str(sbom)]
+        )
+        assert result["passed"] is True  # Not a failure — just a warning
+        assert any(
+            "component" in issue.lower() for issue in result["issues"]
+        )
+
+
+# ---------------------------------------------------------------------------
+# Provenance gate (FEAT-02) -- RED until Wave 2 implements evaluate_provenance
+# ---------------------------------------------------------------------------
+
+
+class TestProvenanceGate:
+    """Test provenance validation via evaluate_local(gate_type='provenance').
+
+    All tests are RED until Wave 2 implements provenance handling in local_evaluator.
+    """
+
+    _INTOTO_STATEMENT = {
+        "_type": "https://in-toto.io/Statement/v1",
+        "subject": [{"name": "my-artifact", "digest": {"sha256": "abc123"}}],
+        "predicateType": "https://slsa.dev/provenance/v1",
+        "predicate": {
+            "buildDefinition": {
+                "buildType": "https://actions.github.io/buildtypes/workflow/v1",
+                "externalParameters": {},
+            },
+            "runDetails": {
+                "builder": {"id": "https://github.com/actions/runner"},
+            },
+        },
+    }
+
+    def test_valid_intoto_passes(self, tmp_path) -> None:
+        """Minimal SLSA v1.0 in-toto statement passes validation."""
+        prov = tmp_path / "provenance.json"
+        prov.write_text(json.dumps(self._INTOTO_STATEMENT))
+        result = evaluate_local(
+            gate_type="provenance", phase_id="1a", evidence_files=[str(prov)]
+        )
+        assert result["passed"] is True
+
+    def test_github_bundle_format_passes(self, tmp_path) -> None:
+        """GitHub attestation bundle with dsseEnvelope passes validation."""
+        import base64
+
+        payload = base64.b64encode(
+            json.dumps(self._INTOTO_STATEMENT).encode()
+        ).decode()
+        bundle = {
+            "dsseEnvelope": {
+                "payload": payload,
+                "payloadType": "application/vnd.in-toto+json",
+                "signatures": [],
+            },
+        }
+        prov = tmp_path / "provenance-bundle.json"
+        prov.write_text(json.dumps(bundle))
+        result = evaluate_local(
+            gate_type="provenance", phase_id="1a", evidence_files=[str(prov)]
+        )
+        assert result["passed"] is True
+
+    def test_missing_predicate_type_fails(self, tmp_path) -> None:
+        """In-toto statement without predicateType fails."""
+        stmt = dict(self._INTOTO_STATEMENT)
+        del stmt["predicateType"]
+        prov = tmp_path / "provenance-no-predtype.json"
+        prov.write_text(json.dumps(stmt))
+        result = evaluate_local(
+            gate_type="provenance", phase_id="1a", evidence_files=[str(prov)]
+        )
+        assert result["passed"] is False
+
+    def test_empty_subject_fails(self, tmp_path) -> None:
+        """In-toto statement with empty subject list fails."""
+        stmt = dict(self._INTOTO_STATEMENT)
+        stmt["subject"] = []
+        prov = tmp_path / "provenance-empty-subject.json"
+        prov.write_text(json.dumps(stmt))
+        result = evaluate_local(
+            gate_type="provenance", phase_id="1a", evidence_files=[str(prov)]
+        )
+        assert result["passed"] is False
