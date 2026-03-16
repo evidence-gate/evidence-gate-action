@@ -498,6 +498,41 @@ def _handle_sticky_comment(
     post_sticky_comment(owner, repo, pr_number, token, results, observe_mode)
 
 
+def _build_retry_prompt(gate_type: str, phase_id: str, result: dict) -> str:
+    """Build machine-readable remediation prompt for AI agent auto-repair.
+
+    Returns empty string when gate passed or no actionable issues found.
+    Caps issues at 10 to keep prompt compact.
+    """
+    if result.get("passed", False):
+        return ""
+
+    issues = [str(i) for i in result.get("issues", []) if isinstance(i, str)][:10]
+    actions = _generate_suggested_actions(gate_type, result)
+
+    if not issues and not actions:
+        return ""
+
+    lines = [
+        f"GATE: {gate_type}",
+        f"PHASE: {phase_id}",
+        "STATUS: FAILED",
+        "ISSUES:",
+    ]
+    for issue in issues:
+        lines.append(f"  - {issue}")
+
+    lines.append("REMEDIATION:")
+    for idx, action in enumerate(actions, 1):
+        clean = action.lstrip("- ")
+        if "] " in clean:
+            clean = clean.split("] ", 1)[1]
+        lines.append(f"  {idx}. {clean}")
+
+    lines.append("RETRY: Re-run gate after completing all REMEDIATION steps.")
+    return "\n".join(lines)
+
+
 def _handle_result(
     *,
     result: dict,
@@ -527,6 +562,7 @@ def _handle_result(
         _set_output("dashboard_url", dashboard_url or "")
         _set_multiline_output("missing_evidence", json.dumps([]))
         _set_multiline_output("suggested_actions", "")
+        _set_multiline_output("retry_prompt", "")
         _set_multiline_output("json_output", json.dumps(result))
         return
 
@@ -568,6 +604,8 @@ def _handle_result(
     _set_multiline_output("missing_evidence", json.dumps(missing))
     actions = _generate_suggested_actions(gate_type, result)
     _set_multiline_output("suggested_actions", "\n".join(actions))
+    retry_prompt = _build_retry_prompt(gate_type, result.get("phase_id", ""), result)
+    _set_multiline_output("retry_prompt", retry_prompt)
 
     _set_multiline_output("json_output", json.dumps(result))
 
@@ -702,10 +740,14 @@ def main() -> dict:
             all_passed = True
         all_missing: list[dict] = []
         all_actions: list[str] = []
+        all_retry_prompts: list[str] = []
         for r in results:
             all_missing.extend(_extract_missing_evidence(r))
             all_actions.extend(
                 _generate_suggested_actions(r.get("gate_type", ""), r)
+            )
+            all_retry_prompts.append(
+                _build_retry_prompt(r.get("gate_type", ""), r.get("phase_id", ""), r)
             )
 
         # Set outputs
@@ -718,6 +760,8 @@ def main() -> dict:
             _set_output("observe_would_pass", str(all_passed).lower())
         _set_multiline_output("missing_evidence", json.dumps(all_missing))
         _set_multiline_output("suggested_actions", "\n".join(all_actions))
+        combined_retry = "\n\n---\n\n".join(p for p in all_retry_prompts if p)
+        _set_multiline_output("retry_prompt", combined_retry)
         _set_multiline_output("json_output", json.dumps(results))
 
         # Sticky comment
