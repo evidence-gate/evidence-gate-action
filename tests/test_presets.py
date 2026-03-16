@@ -41,9 +41,9 @@ class TestExpandPreset:
         assert "performance" in result
 
     def test_expand_preset_supply_chain(self) -> None:
-        """supply-chain returns 4 gates: security, dependency, compliance, build."""
+        """supply-chain returns 6 gates: security, dependency, compliance, build, sbom, provenance."""
         result = expand_preset("supply-chain")
-        assert result == ["security", "dependency", "compliance", "build"]
+        assert result == ["security", "dependency", "compliance", "build", "sbom", "provenance"]
 
     def test_expand_preset_unknown_raises_value_error(self) -> None:
         """Unknown preset name raises ValueError with descriptive message listing valid presets."""
