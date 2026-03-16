@@ -1481,3 +1481,63 @@ class TestAnnotationLevels:
         )
         captured = capsys.readouterr()
         assert "::warning" in captured.out
+
+
+class TestSignalHierarchy:
+    """QUAL-05: signal hierarchy -- severity classification and sorted issue table.
+
+    All tests are RED until Plan 03 implements _classify_severity and _write_issues_table.
+    """
+
+    def test_classify_severity_critical_keywords(self) -> None:
+        """_classify_severity maps keywords to correct severity levels.
+
+        RED: AttributeError -- _classify_severity does not yet exist on entrypoint module.
+        """
+        assert entrypoint._classify_severity("build failed") == "Critical"
+        assert entrypoint._classify_severity("coverage below threshold") == "Warning"
+        assert entrypoint._classify_severity("evaluation done") == "Info"
+
+    def test_write_issues_table_sorted_critical_first(self) -> None:
+        """_write_issues_table returns lines with Critical before Warning before Info.
+
+        RED: AttributeError -- _write_issues_table does not yet exist on entrypoint module.
+        """
+        lines = entrypoint._write_issues_table(
+            ["evaluation done", "build failed", "coverage below threshold"], []
+        )
+        text = "\n".join(lines)
+        critical_pos = text.index("Critical")
+        warning_pos = text.index("Warning")
+        info_pos = text.index("Info")
+        assert critical_pos < warning_pos < info_pos
+
+    def test_write_summary_uses_hierarchy_table(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """Full main() call with 'failed' keyword produces summary with '| Critical |' row.
+
+        RED: summary does not yet contain hierarchy table rows.
+        """
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {
+                "passed": False,
+                "issues": ["build failed", "coverage below threshold"],
+                "metadata": {},
+            }
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        summary_text = summary.read_text()
+        assert "| Critical |" in summary_text
