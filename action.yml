@@ -15,11 +15,17 @@ inputs:
     required: false
     default: ""
   gate_type:
-    description: "Gate type to evaluate (e.g., skill, xac, security)"
-    required: true
+    description: "Gate type to evaluate (e.g., skill, xac, security). Can also be set in .evidencegate.yml config file."
+    required: false
+    default: ""
   phase_id:
-    description: "Phase ID (e.g., 1a, 2b)"
-    required: true
+    description: "Phase ID (e.g., 1a, 2b). Can also be set in .evidencegate.yml config file."
+    required: false
+    default: ""
+  config_path:
+    description: "Path to .evidencegate.yml config file. Defaults to GITHUB_WORKSPACE/.evidencegate.yml."
+    required: false
+    default: ""
   evidence_files:
     description: "Comma-separated list of evidence file paths"
     required: false
@@ -112,6 +118,10 @@ runs:
         restore-keys: |
           ${{ runner.os }}-pip-eg-
 
+    - name: Install pyyaml
+      shell: bash
+      run: pip install pyyaml
+
     - name: Install evaluator
       if: inputs.version != 'latest' && inputs.version != ''
       shell: bash
@@ -134,5 +144,6 @@ runs:
         EG_VERSION: ${{ inputs.version }}
         EG_GATE_PRESET: ${{ inputs.gate_preset }}
         EG_STICKY_COMMENT: ${{ inputs.sticky_comment }}
+        EG_CONFIG_PATH: ${{ inputs.config_path }}
         GITHUB_TOKEN: ${{ github.token }}
       run: python ${{ github.action_path }}/src/entrypoint.py
