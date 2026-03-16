@@ -19,6 +19,13 @@ import uuid
 from fnmatch import fnmatch
 from urllib.parse import urlencode
 
+from config_loader import (
+    ConfigError,
+    get_config_path,
+    load_config,
+    resolve_config,
+    validate_config,
+)
 from core import (
     collect_evidence_refs,
     evaluate,
@@ -529,11 +536,36 @@ def _handle_result(
 
 def main() -> dict:
     """Run Evidence Gate evaluation for GitHub Actions."""
-    gate_type = os.environ.get("EG_GATE_TYPE", "").strip()
-    phase_id = os.environ.get("EG_PHASE_ID", "").strip()
-    gate_preset = os.environ.get("EG_GATE_PRESET", "").strip()
+    # --- Config file loading (CONFIG-01..CONFIG-05) ---
+    env_config_path = os.environ.get("EG_CONFIG_PATH", "").strip()
+    config_path = get_config_path(env_config_path)
+
+    try:
+        file_config = load_config(config_path)
+    except ConfigError:
+        sys.exit(1)
+
+    errors = validate_config(file_config, config_path)
+    if errors:
+        sys.exit(1)
+
+    # Resolve all settings: env > config file > defaults
+    resolved = resolve_config(
+        env_gate_type=os.environ.get("EG_GATE_TYPE", "").strip(),
+        env_phase_id=os.environ.get("EG_PHASE_ID", "").strip(),
+        env_mode=os.environ.get("EG_MODE", "").strip(),
+        env_evidence_files=os.environ.get("EG_EVIDENCE_FILES", "").strip(),
+        env_gate_preset=os.environ.get("EG_GATE_PRESET", "").strip(),
+        env_config_path=env_config_path,
+        file_config=file_config,
+    )
+
+    gate_type = resolved.gate_type
+    phase_id = resolved.phase_id
+    gate_preset = resolved.gate_preset
+    evidence_files_str = resolved.evidence_files
+
     run_id = os.environ.get("EG_RUN_ID", "") or os.environ.get("GITHUB_RUN_ID", "")
-    evidence_files_str = os.environ.get("EG_EVIDENCE_FILES", "")
     github_run_url = _github_run_url()
     dashboard_url = _build_dashboard_url(run_id or None)
     evidence_url = os.environ.get("EG_EVIDENCE_URL", "").strip() or dashboard_url
@@ -569,7 +601,7 @@ def main() -> dict:
     mode = _detect_mode(api_key)
 
     # Observe mode detection
-    observe_mode = os.environ.get("EG_MODE", "enforce").lower() == "observe"
+    observe_mode = resolved.mode.lower() == "observe"
     if observe_mode:
         print(
             "::notice title=Evidence Gate::"
