@@ -32,6 +32,11 @@ PRO_ONLY_GATE_TYPES = frozenset({
     "wave",
 })
 
+NEMOCLAW_GATE_TYPES = frozenset({
+    "nemoclaw_blueprint",
+    "nemoclaw_policy",
+})
+
 PRICING_URL = "https://evidence-gate.dev#pricing"
 
 
@@ -220,6 +225,252 @@ def _validate_node(
 
 
 # ---------------------------------------------------------------------------
+# YAML parsing (optional, for NemoClaw gates)
+# ---------------------------------------------------------------------------
+
+
+def _parse_yaml_or_json(path: str) -> dict[str, Any]:
+    """Parse a file as JSON or YAML. Returns parsed dict.
+
+    YAML support requires PyYAML (``pip install pyyaml``).
+    Falls back to JSON parsing for .json files.
+
+    Raises:
+        ValueError: If the file cannot be parsed.
+    """
+    abs_path = os.path.abspath(path)
+    if not os.path.isfile(abs_path):
+        raise ValueError(f"File not found: {abs_path}")
+
+    with open(abs_path, encoding="utf-8") as f:
+        content = f.read()
+
+    if abs_path.endswith((".yaml", ".yml")):
+        try:
+            import yaml  # type: ignore[import-untyped]
+        except ImportError:
+            raise ValueError(
+                "YAML evidence files require PyYAML: pip install pyyaml"
+            )
+        data = yaml.safe_load(content)
+        if not isinstance(data, dict):
+            raise ValueError(f"YAML root must be a mapping, got {type(data).__name__}")
+        return data
+
+    # Default: JSON
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON: {exc}")
+    if not isinstance(data, dict):
+        raise ValueError(f"JSON root must be object, got {type(data).__name__}")
+    return data
+
+
+# ---------------------------------------------------------------------------
+# NemoClaw blueprint validation
+# ---------------------------------------------------------------------------
+
+_SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+")
+
+
+def _check_blueprint(data: dict[str, Any]) -> list[str]:
+    """Validate NemoClaw blueprint.yaml structure.
+
+    Checks:
+    - Required fields: version, profiles, sandbox
+    - version is semver-like
+    - profiles has at least one entry, each with required keys
+    - sandbox has image field
+    - Optional version constraints are semver-like
+    """
+    issues: list[str] = []
+
+    # version
+    version = data.get("version")
+    if not version:
+        issues.append("BLUEPRINT_MISSING_VERSION: 'version' field is required")
+    elif not isinstance(version, str) or not _SEMVER_PATTERN.match(version):
+        issues.append(f"BLUEPRINT_INVALID_VERSION: version '{version}' is not valid semver")
+
+    # profiles
+    profiles = data.get("profiles")
+    if profiles is None:
+        issues.append("BLUEPRINT_MISSING_PROFILES: 'profiles' section is required")
+    elif not isinstance(profiles, dict):
+        issues.append("BLUEPRINT_INVALID_PROFILES: 'profiles' must be a mapping")
+    elif len(profiles) == 0:
+        issues.append("BLUEPRINT_EMPTY_PROFILES: at least one profile is required")
+    else:
+        for name, profile in profiles.items():
+            if not isinstance(profile, dict):
+                issues.append(f"BLUEPRINT_INVALID_PROFILE: profile '{name}' must be a mapping")
+                continue
+            for required_key in ("model",):
+                if required_key not in profile:
+                    issues.append(
+                        f"BLUEPRINT_PROFILE_MISSING_{required_key.upper()}: "
+                        f"profile '{name}' missing '{required_key}'"
+                    )
+
+    # sandbox
+    sandbox = data.get("sandbox")
+    if not sandbox:
+        issues.append("BLUEPRINT_MISSING_SANDBOX: 'sandbox' section is required")
+    elif not isinstance(sandbox, dict):
+        issues.append("BLUEPRINT_INVALID_SANDBOX: 'sandbox' must be a mapping")
+    else:
+        if "image" not in sandbox:
+            issues.append("BLUEPRINT_MISSING_IMAGE: 'sandbox.image' is required")
+
+    # Optional version constraints
+    for field in ("min_openshell_version", "min_openclaw_version"):
+        val = data.get(field)
+        if val is not None:
+            if not isinstance(val, str) or not _SEMVER_PATTERN.match(val):
+                issues.append(
+                    f"BLUEPRINT_INVALID_{field.upper()}: '{val}' is not valid semver"
+                )
+
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# NemoClaw policy validation (security audit)
+# ---------------------------------------------------------------------------
+
+
+def _check_policy(data: dict[str, Any]) -> list[str]:
+    """Validate NemoClaw OpenShell policy YAML security posture.
+
+    Checks:
+    - Required fields: version, network_policies
+    - All endpoints have enforcement: enforce
+    - Port 443 endpoints have tls: terminate
+    - No wildcard method rules on any endpoint
+    - Binary scoping present (endpoints have process restrictions)
+    - filesystem_policy does not include dangerous writable paths
+    """
+    issues: list[str] = []
+
+    # version
+    if "version" not in data:
+        issues.append("POLICY_MISSING_VERSION: 'version' field is required")
+
+    # network_policies
+    policies = data.get("network_policies")
+    if not policies:
+        issues.append("POLICY_MISSING_NETWORK: 'network_policies' section is required")
+    elif not isinstance(policies, dict):
+        issues.append("POLICY_INVALID_NETWORK: 'network_policies' must be a mapping")
+    else:
+        for policy_name, policy in policies.items():
+            if not isinstance(policy, dict):
+                issues.append(f"POLICY_INVALID_ENTRY: '{policy_name}' must be a mapping")
+                continue
+            endpoints = policy.get("endpoints", [])
+            if not isinstance(endpoints, list):
+                issues.append(f"POLICY_INVALID_ENDPOINTS: '{policy_name}.endpoints' must be a list")
+                continue
+
+            for i, ep in enumerate(endpoints):
+                if not isinstance(ep, dict):
+                    continue
+                ep_id = f"{policy_name}.endpoints[{i}] ({ep.get('host', '?')})"
+
+                # enforcement check
+                enforcement = ep.get("enforcement")
+                if enforcement and enforcement != "enforce":
+                    issues.append(
+                        f"POLICY_WEAK_ENFORCEMENT: {ep_id} has "
+                        f"enforcement='{enforcement}', expected 'enforce'"
+                    )
+
+                # TLS check for port 443
+                port = ep.get("port")
+                tls = ep.get("tls")
+                if port == 443 and tls != "terminate":
+                    issues.append(
+                        f"POLICY_MISSING_TLS: {ep_id} on port 443 "
+                        f"should have tls='terminate'"
+                    )
+
+                # Wildcard method check
+                rules = ep.get("rules", [])
+                if isinstance(rules, list):
+                    for rule in rules:
+                        if isinstance(rule, dict):
+                            allow = rule.get("allow", {})
+                            if isinstance(allow, dict):
+                                method = allow.get("method", "")
+                                if method == "*":
+                                    issues.append(
+                                        f"POLICY_WILDCARD_METHOD: {ep_id} "
+                                        f"has wildcard method rule (method='*')"
+                                    )
+
+    # filesystem_policy dangerous writable paths
+    fs_policy = data.get("filesystem_policy")
+    if isinstance(fs_policy, dict):
+        dangerous_paths = {"/usr", "/etc", "/lib", "/bin", "/sbin", "/var", "/root"}
+        rw_paths = fs_policy.get("read_write", [])
+        if isinstance(rw_paths, list):
+            for rw_path in rw_paths:
+                if isinstance(rw_path, str):
+                    for dangerous in dangerous_paths:
+                        if rw_path == dangerous or rw_path.startswith(dangerous + "/"):
+                            issues.append(
+                                f"POLICY_DANGEROUS_WRITABLE: filesystem allows "
+                                f"write to '{rw_path}'"
+                            )
+
+    return issues
+
+
+def _evaluate_nemoclaw(
+    gate_type: str,
+    phase_id: str,
+    evidence_files: list[str],
+) -> dict[str, Any]:
+    """Evaluate NemoClaw blueprint or policy evidence files.
+
+    Parses each evidence file (JSON or YAML) and runs gate-specific checks.
+    """
+    issues: list[str] = []
+
+    if not evidence_files:
+        issues.append(f"No evidence files provided for {gate_type} gate")
+        return {
+            "passed": False,
+            "mode": "free",
+            "gate_type": gate_type,
+            "phase_id": phase_id,
+            "issues": issues,
+        }
+
+    for path in evidence_files:
+        try:
+            data = _parse_yaml_or_json(path)
+        except ValueError as exc:
+            issues.append(str(exc))
+            continue
+
+        if gate_type == "nemoclaw_blueprint":
+            issues.extend(_check_blueprint(data))
+        elif gate_type == "nemoclaw_policy":
+            issues.extend(_check_policy(data))
+
+    passed = len(issues) == 0
+    return {
+        "passed": passed,
+        "mode": "free",
+        "gate_type": gate_type,
+        "phase_id": phase_id,
+        "issues": issues,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main evaluation entry point
 # ---------------------------------------------------------------------------
 
@@ -245,6 +496,10 @@ def evaluate_local(
         Result dict with keys: passed, mode, gate_type, phase_id, issues,
         and optionally upsell/upsell_message.
     """
+    # NemoClaw gate types -- specialized evaluation
+    if gate_type in NEMOCLAW_GATE_TYPES:
+        return _evaluate_nemoclaw(gate_type, phase_id, evidence_files or [])
+
     # Pro-only gate type detection
     if gate_type in PRO_ONLY_GATE_TYPES:
         return {

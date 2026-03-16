@@ -147,6 +147,15 @@ _RECOMMENDATION_TABLE: list[tuple[str, str, dict]] = [
     ("build", "BUILD_FAIL*", {"action_id": "build-fix-compilation", "description": "Fix compilation errors before re-evaluation", "priority": "high"}),
     ("test_coverage", "COVERAGE_BELOW*", {"action_id": "coverage-add-tests", "description": "Add tests to improve code coverage", "priority": "medium"}),
     ("privacy", "PRIVACY_*", {"action_id": "privacy-update-manifest", "description": "Update privacy manifest and data handling declarations", "priority": "medium"}),
+    ("nemoclaw_blueprint", "BLUEPRINT_MISSING_*", {"action_id": "nemoclaw-fix-blueprint", "description": "Add missing required fields to NemoClaw blueprint.yaml", "priority": "high"}),
+    ("nemoclaw_blueprint", "BLUEPRINT_INVALID_*", {"action_id": "nemoclaw-fix-blueprint-format", "description": "Fix invalid field format in NemoClaw blueprint.yaml", "priority": "high"}),
+    ("nemoclaw_blueprint", "BLUEPRINT_EMPTY_*", {"action_id": "nemoclaw-add-profile", "description": "Add at least one inference profile to NemoClaw blueprint", "priority": "high"}),
+    ("nemoclaw_blueprint", "BLUEPRINT_PROFILE_*", {"action_id": "nemoclaw-fix-profile", "description": "Add missing fields to NemoClaw inference profile", "priority": "medium"}),
+    ("nemoclaw_policy", "POLICY_MISSING_*", {"action_id": "nemoclaw-fix-policy-structure", "description": "Add missing required sections to OpenShell policy", "priority": "high"}),
+    ("nemoclaw_policy", "POLICY_WEAK_*", {"action_id": "nemoclaw-enforce-policy", "description": "Set enforcement mode to 'enforce' on all OpenShell endpoints", "priority": "high"}),
+    ("nemoclaw_policy", "POLICY_MISSING_TLS*", {"action_id": "nemoclaw-add-tls", "description": "Enable TLS termination on port 443 endpoints", "priority": "high"}),
+    ("nemoclaw_policy", "POLICY_WILDCARD_*", {"action_id": "nemoclaw-restrict-methods", "description": "Replace wildcard HTTP method rules with specific method constraints", "priority": "medium"}),
+    ("nemoclaw_policy", "POLICY_DANGEROUS_*", {"action_id": "nemoclaw-fix-filesystem", "description": "Remove dangerous writable paths from filesystem policy", "priority": "high"}),
     ("*", "MISSING_EVIDENCE*", {"action_id": "missing-evidence-provide", "description": "Provide required evidence for this gate", "priority": "high"}),
     ("*", "*", {"action_id": "generic-review-issue", "description": "Review and address the reported issue", "priority": "low"}),
 ]
@@ -162,6 +171,15 @@ _KEYWORD_PATTERNS: list[tuple[str, str]] = [
     (r"\bcompil", "BUILD_FAILURE"),
     (r"\btimeout\b", "BUILD_FAILURE"),
     (r"\bprivacy\b", "PRIVACY_ISSUE"),
+    (r"\bBLUEPRINT_MISSING_", "BLUEPRINT_MISSING_FIELD"),
+    (r"\bBLUEPRINT_INVALID_", "BLUEPRINT_INVALID_FORMAT"),
+    (r"\bBLUEPRINT_EMPTY_", "BLUEPRINT_EMPTY_PROFILES"),
+    (r"\bBLUEPRINT_PROFILE_", "BLUEPRINT_PROFILE_INCOMPLETE"),
+    (r"\bPOLICY_MISSING_", "POLICY_MISSING_FIELD"),
+    (r"\bPOLICY_WEAK_", "POLICY_WEAK_ENFORCEMENT"),
+    (r"\bPOLICY_MISSING_TLS", "POLICY_MISSING_TLS"),
+    (r"\bPOLICY_WILDCARD_", "POLICY_WILDCARD_METHOD"),
+    (r"\bPOLICY_DANGEROUS_", "POLICY_DANGEROUS_WRITABLE"),
 ]
 
 _PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
