@@ -231,10 +231,12 @@ def _generate_suggested_actions(gate_type: str, result: dict) -> list[str]:
 
 
 def _emit_annotations(
-    issues: list[str], passed: bool, *, observe_mode: bool = False
+    issues: list[str], passed: bool, *, observe_mode: bool = False, warn_mode: bool = False
 ) -> None:
     if observe_mode:
         level = "notice"
+    elif warn_mode:
+        level = "warning"  # Always warning in warn mode regardless of passed state
     else:
         level = "warning" if passed else "error"
     title = "Evidence Gate"
@@ -276,6 +278,7 @@ def _write_summary(
     dashboard_url: str | None,
     mode: str,
     observe_mode: bool = False,
+    warn_mode: bool = False,
 ) -> None:
     metadata = result.get("metadata")
     metadata_dict = metadata if isinstance(metadata, dict) else {}
@@ -289,6 +292,8 @@ def _write_summary(
     heading = _build_heading()
     if observe_mode:
         status_text = "OBSERVE (PASS)" if passed else "OBSERVE (would FAIL)"
+    elif warn_mode:
+        status_text = "WARN (PASS)" if passed else "WARN (would FAIL)"
     else:
         status_text = "PASS" if passed else "FAIL"
 
@@ -474,6 +479,7 @@ def _handle_result(
     evidence_url: str | None,
     mode: str,
     observe_mode: bool,
+    warn_mode: bool = False,
 ) -> None:
     """Write summary, annotations, and outputs for a single-gate result."""
     # Handle upsell (Free mode + Pro-only gate type)
@@ -511,10 +517,13 @@ def _handle_result(
         dashboard_url=dashboard_url,
         mode=mode,
         observe_mode=observe_mode,
+        warn_mode=warn_mode,
     )
-    _emit_annotations(issue_list, passed=passed, observe_mode=observe_mode)
+    _emit_annotations(issue_list, passed=passed, observe_mode=observe_mode, warn_mode=warn_mode)
 
-    _set_output("passed", str(passed).lower())
+    # QUAL-04: warn mode reports passed=true in outputs even when gate failed
+    output_passed = True if warn_mode else passed
+    _set_output("passed", str(output_passed).lower())
     _set_output("mode", mode)
     _set_output("run_id", run_id)
     _set_output("trace_url", str(trace_url))
@@ -602,10 +611,16 @@ def main() -> dict:
 
     # Observe mode detection
     observe_mode = resolved.mode.lower() == "observe"
+    warn_mode = resolved.mode.lower() == "warn"
     if observe_mode:
         print(
             "::notice title=Evidence Gate::"
             "Running in observe mode -- failures will not block this step"
+        )
+    if warn_mode:
+        print(
+            "::notice title=Evidence Gate::"
+            "Running in warn mode -- failures will not block this step"
         )
 
     # Debug logging (DX-03)
@@ -648,10 +663,14 @@ def main() -> dict:
                 dashboard_url=dashboard_url,
                 mode=mode,
                 observe_mode=observe_mode,
+                warn_mode=warn_mode,
             )
 
         # Aggregate results
         all_passed = all(r.get("passed", False) for r in results)
+        # QUAL-04: warn mode always succeeds (step exit 0)
+        if warn_mode:
+            all_passed = True
         all_missing: list[dict] = []
         all_actions: list[str] = []
         for r in results:
@@ -700,11 +719,16 @@ def main() -> dict:
         evidence_url=evidence_url,
         mode=mode,
         observe_mode=observe_mode,
+        warn_mode=warn_mode,
     )
 
     # Sticky comment (single gate)
     _handle_sticky_comment([result], observe_mode)
 
+    # QUAL-04: warn mode always succeeds (step exit 0)
+    if warn_mode and not result.get("passed", True):
+        result = dict(result)
+        result["passed"] = True
     return result
 
 
