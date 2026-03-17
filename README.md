@@ -1,3 +1,5 @@
+**English** | [日本語](README.ja.md)
+
 # Evidence Gate Action
 
 Fail-closed quality gates for GitHub Actions with audit-grade evidence chains.
