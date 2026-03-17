@@ -45,6 +45,11 @@ class TestExpandPreset:
         result = expand_preset("supply-chain")
         assert result == ["security", "dependency", "compliance", "build", "sbom", "provenance"]
 
+    def test_expand_preset_nemoclaw_baseline(self) -> None:
+        """nemoclaw-baseline returns 4 gates: nemoclaw_blueprint, nemoclaw_policy, security, build."""
+        result = expand_preset("nemoclaw-baseline")
+        assert result == ["nemoclaw_blueprint", "nemoclaw_policy", "security", "build"]
+
     def test_expand_preset_unknown_raises_value_error(self) -> None:
         """Unknown preset name raises ValueError with descriptive message listing valid presets."""
         with pytest.raises(ValueError, match="Unknown preset") as exc_info:
@@ -55,9 +60,9 @@ class TestExpandPreset:
         assert "api-service" in error_msg
         assert "supply-chain" in error_msg
 
-    def test_presets_dict_has_four_entries(self) -> None:
-        """PRESETS dict has exactly 4 entries."""
-        assert len(PRESETS) == 4
+    def test_presets_dict_has_five_entries(self) -> None:
+        """PRESETS dict has exactly 5 entries (4 original + nemoclaw-baseline)."""
+        assert len(PRESETS) == 5
 
     def test_expand_preset_returns_copy(self) -> None:
         """expand_preset returns a copy, not the original list reference."""

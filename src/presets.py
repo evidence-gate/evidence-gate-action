@@ -45,6 +45,12 @@ PRESETS: dict[str, list[str]] = {
         "sbom",
         "provenance",
     ],
+    "nemoclaw-baseline": [
+        "nemoclaw_blueprint",
+        "nemoclaw_policy",
+        "security",
+        "build",
+    ],
 }
 
 
