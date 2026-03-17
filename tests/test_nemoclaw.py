@@ -18,11 +18,9 @@ from local_evaluator import (
     NEMOCLAW_GATE_TYPES,
     _check_blueprint,
     _check_policy,
-    _evaluate_nemoclaw,
     _parse_yaml_or_json,
     evaluate_local,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

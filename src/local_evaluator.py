@@ -14,6 +14,7 @@ Uses only stdlib -- no third-party dependencies.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -248,10 +249,10 @@ def _parse_yaml_or_json(path: str) -> dict[str, Any]:
     if abs_path.endswith((".yaml", ".yml")):
         try:
             import yaml  # type: ignore[import-untyped]
-        except ImportError:
+        except ImportError as err:
             raise ValueError(
                 "YAML evidence files require PyYAML: pip install pyyaml"
-            )
+            ) from err
         data = yaml.safe_load(content)
         if not isinstance(data, dict):
             raise ValueError(f"YAML root must be a mapping, got {type(data).__name__}")
@@ -261,7 +262,7 @@ def _parse_yaml_or_json(path: str) -> dict[str, Any]:
     try:
         data = json.loads(content)
     except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid JSON: {exc}")
+        raise ValueError(f"Invalid JSON: {exc}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"JSON root must be object, got {type(data).__name__}")
     return data
@@ -326,11 +327,10 @@ def _check_blueprint(data: dict[str, Any]) -> list[str]:
     # Optional version constraints
     for field in ("min_openshell_version", "min_openclaw_version"):
         val = data.get(field)
-        if val is not None:
-            if not isinstance(val, str) or not _SEMVER_PATTERN.match(val):
-                issues.append(
-                    f"BLUEPRINT_INVALID_{field.upper()}: '{val}' is not valid semver"
-                )
+        if val is not None and (not isinstance(val, str) or not _SEMVER_PATTERN.match(val)):
+            issues.append(
+                f"BLUEPRINT_INVALID_{field.upper()}: '{val}' is not valid semver"
+            )
 
     return issues
 
@@ -471,6 +471,242 @@ def _evaluate_nemoclaw(
 
 
 # ---------------------------------------------------------------------------
+# SBOM evaluation
+# ---------------------------------------------------------------------------
+
+MAX_ISSUES = 10
+
+
+def _detect_sbom_format(data: dict[str, Any]) -> str | None:
+    """Detect SBOM format from parsed JSON data.
+
+    Returns:
+        "cyclonedx", "spdx", or None if unrecognized.
+    """
+    # CycloneDX detection: bomFormat == "CycloneDX" and specVersion present
+    if data.get("bomFormat") == "CycloneDX" and "specVersion" in data:
+        return "cyclonedx"
+
+    # SPDX detection: spdxVersion or SPDXVersion starts with "SPDX-" and SPDXID present
+    spdx_ver = data.get("spdxVersion") or data.get("SPDXVersion") or ""
+    if isinstance(spdx_ver, str) and spdx_ver.startswith("SPDX-") and "SPDXID" in data:
+        return "spdx"
+
+    return None
+
+
+def evaluate_sbom(
+    phase_id: str,
+    evidence_files: list[str],
+) -> dict[str, Any]:
+    """Evaluate SBOM evidence files (CycloneDX or SPDX).
+
+    Performs structural validation -- not cryptographic.
+    Unrecognized formats fail; empty components/packages produce a warning
+    but the result still passes.
+
+    Returns:
+        Result dict with keys: passed, mode, gate_type, phase_id, issues.
+    """
+    issues: list[str] = []
+
+    for efile in evidence_files:
+        if len(issues) >= MAX_ISSUES:
+            break
+
+        # File existence check
+        exists_result = check_file_exists(efile)
+        if not exists_result["passed"]:
+            issues.append(exists_result["message"])
+            continue
+
+        # Parse JSON
+        json_result = check_json_valid(efile)
+        if not json_result["passed"]:
+            issues.append(json_result["message"])
+            continue
+
+        data = json_result["data"]
+        if not isinstance(data, dict):
+            issues.append(f"SBOM root must be an object, got {type(data).__name__}")
+            continue
+
+        # Detect format
+        fmt = _detect_sbom_format(data)
+        if fmt is None:
+            issues.append(
+                "Unrecognized SBOM format: neither CycloneDX nor SPDX fields found"
+            )
+            continue
+
+        # Validate components/packages
+        if fmt == "cyclonedx":
+            components = data.get("components")
+            if not components:
+                issues.append(
+                    "Warning: CycloneDX SBOM has empty or missing components array"
+                )
+        elif fmt == "spdx":
+            packages = data.get("packages")
+            if not packages:
+                issues.append(
+                    "Warning: SPDX SBOM has empty or missing packages array"
+                )
+
+    # Warnings (component/package emptiness) do not cause failure
+    failed = any(
+        not issue.startswith("Warning:") for issue in issues
+    )
+    return {
+        "passed": not failed,
+        "mode": "free",
+        "gate_type": "sbom",
+        "phase_id": phase_id,
+        "issues": issues[:MAX_ISSUES],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Provenance evaluation
+# ---------------------------------------------------------------------------
+
+
+def _validate_intoto_statement(
+    stmt: dict[str, Any],
+    issues: list[str],
+    source_label: str = "",
+) -> None:
+    """Validate an in-toto v1 statement structure.
+
+    Appends issues for missing/invalid fields.
+    """
+    prefix = f"{source_label}: " if source_label else ""
+
+    # _type field
+    stmt_type = stmt.get("_type", "")
+    if not isinstance(stmt_type, str) or not stmt_type.startswith(
+        "https://in-toto.io/Statement/"
+    ):
+        issues.append(
+            f"{prefix}Missing or invalid '_type' field "
+            "(expected 'https://in-toto.io/Statement/...')"
+        )
+
+    # subject: non-empty list with name + digest
+    subject = stmt.get("subject")
+    if not isinstance(subject, list) or len(subject) == 0:
+        issues.append(f"{prefix}Missing or empty 'subject' list")
+    else:
+        for i, subj in enumerate(subject):
+            if not isinstance(subj, dict):
+                issues.append(f"{prefix}subject[{i}]: expected object")
+                continue
+            if "name" not in subj:
+                issues.append(f"{prefix}subject[{i}]: missing 'name'")
+            if "digest" not in subj or not isinstance(subj.get("digest"), dict):
+                issues.append(f"{prefix}subject[{i}]: missing or invalid 'digest'")
+
+    # predicateType
+    if "predicateType" not in stmt:
+        issues.append(f"{prefix}Missing 'predicateType' field")
+
+    # predicate
+    predicate = stmt.get("predicate")
+    if not isinstance(predicate, dict):
+        issues.append(f"{prefix}Missing or invalid 'predicate' object")
+    else:
+        # SLSA v1.0 specific checks
+        build_def = predicate.get("buildDefinition")
+        if isinstance(build_def, dict) and "buildType" not in build_def:
+            issues.append(
+                f"{prefix}predicate.buildDefinition missing 'buildType'"
+            )
+        run_details = predicate.get("runDetails")
+        if isinstance(run_details, dict):
+            builder = run_details.get("builder")
+            if isinstance(builder, dict) and "id" not in builder:
+                issues.append(
+                    f"{prefix}predicate.runDetails.builder missing 'id'"
+                )
+
+
+def evaluate_provenance(
+    phase_id: str,
+    evidence_files: list[str],
+) -> dict[str, Any]:
+    """Evaluate provenance evidence files (in-toto DSSE or GitHub attestation bundle).
+
+    Detects format:
+    - dsseEnvelope key -> GitHub attestation bundle (base64 payload decoded)
+    - _type key -> raw in-toto statement
+
+    Performs structural validation of the in-toto statement.
+
+    Returns:
+        Result dict with keys: passed, mode, gate_type, phase_id, issues.
+    """
+    issues: list[str] = []
+
+    for efile in evidence_files:
+        if len(issues) >= MAX_ISSUES:
+            break
+
+        # File existence check
+        exists_result = check_file_exists(efile)
+        if not exists_result["passed"]:
+            issues.append(exists_result["message"])
+            continue
+
+        # Parse JSON
+        json_result = check_json_valid(efile)
+        if not json_result["passed"]:
+            issues.append(json_result["message"])
+            continue
+
+        data = json_result["data"]
+        if not isinstance(data, dict):
+            issues.append(
+                f"Provenance root must be an object, got {type(data).__name__}"
+            )
+            continue
+
+        # Detect format: dsseEnvelope first, then raw in-toto
+        if "dsseEnvelope" in data:
+            envelope = data["dsseEnvelope"]
+            if not isinstance(envelope, dict) or "payload" not in envelope:
+                issues.append("dsseEnvelope missing 'payload' field")
+                continue
+            try:
+                raw_payload = base64.b64decode(envelope["payload"])
+                stmt = json.loads(raw_payload)
+            except (ValueError, json.JSONDecodeError):
+                issues.append(
+                    "Failed to decode attestation bundle payload"
+                )
+                continue
+            if not isinstance(stmt, dict):
+                issues.append("Decoded payload is not a JSON object")
+                continue
+            _validate_intoto_statement(stmt, issues, source_label="bundle")
+        elif "_type" in data:
+            _validate_intoto_statement(data, issues)
+        else:
+            issues.append(
+                "Unrecognized provenance format: "
+                "neither dsseEnvelope nor _type field found"
+            )
+
+    passed = len(issues) == 0
+    return {
+        "passed": passed,
+        "mode": "free",
+        "gate_type": "provenance",
+        "phase_id": phase_id,
+        "issues": issues[:MAX_ISSUES],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main evaluation entry point
 # ---------------------------------------------------------------------------
 
@@ -514,6 +750,12 @@ def evaluate_local(
                 f"Upgrade at {PRICING_URL} to unlock advanced gate types."
             ),
         }
+
+    # Specialised gate type dispatch (Free mode)
+    if gate_type == "sbom":
+        return evaluate_sbom(phase_id, evidence_files or [])
+    if gate_type == "provenance":
+        return evaluate_provenance(phase_id, evidence_files or [])
 
     issues: list[str] = []
     evidence_files = evidence_files or []

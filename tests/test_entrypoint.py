@@ -1268,3 +1268,378 @@ class TestStickyComment:
         captured = capsys.readouterr()
         assert "::warning title=Evidence Gate::" in captured.out
         assert "no PR context" in captured.out
+
+
+class TestConfigFileIntegration:
+    """Integration tests for config-file-driven main() -- CONFIG-01, CONFIG-03.
+
+    These tests are RED until Plan 03 wires config_loader into entrypoint.main().
+    """
+
+    def test_main_succeeds_with_config_file_zero_inputs(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """CONFIG-01: main() succeeds when .evidencegate.yml provides gate_type + phase_id."""
+        config_file = tmp_path / ".evidencegate.yml"
+        config_file.write_text("gate_type: test_coverage\nphase_id: ci\n")
+
+        output = tmp_path / "output.txt"
+        monkeypatch.setenv("GITHUB_WORKSPACE", str(tmp_path))
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.delenv("EG_GATE_TYPE", raising=False)
+        monkeypatch.delenv("EG_PHASE_ID", raising=False)
+        monkeypatch.delenv("EG_API_KEY", raising=False)
+
+        monkeypatch.setattr(
+            entrypoint, "evaluate_local",
+            lambda **kwargs: {"passed": True, "issues": []},
+        )
+
+        result = entrypoint.main()
+        assert result.get("passed") is True
+
+    def test_explicit_input_wins_over_config_file(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """CONFIG-03: explicit action input takes precedence over config file value."""
+        config_file = tmp_path / ".evidencegate.yml"
+        config_file.write_text("gate_type: from_config\nphase_id: ci\n")
+
+        output = tmp_path / "output.txt"
+        monkeypatch.setenv("GITHUB_WORKSPACE", str(tmp_path))
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("EG_GATE_TYPE", "explicit_type")  # explicit wins
+        monkeypatch.setenv("EG_PHASE_ID", "ci")
+        monkeypatch.delenv("EG_API_KEY", raising=False)
+
+        seen_gate_types: list[str] = []
+
+        def _capture_local(**kwargs):
+            seen_gate_types.append(kwargs.get("gate_type", ""))
+            return {"passed": True, "issues": []}
+
+        monkeypatch.setattr(entrypoint, "evaluate_local", _capture_local)
+
+        entrypoint.main()
+        assert seen_gate_types == ["explicit_type"], (
+            f"Expected gate_type='explicit_type' (explicit input wins), "
+            f"got {seen_gate_types}"
+        )
+
+    def test_main_exits_with_error_when_no_gate_type_in_config_or_input(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """CONFIG-01: main() exits(1) when neither config nor input provides gate_type."""
+        config_file = tmp_path / ".evidencegate.yml"
+        config_file.write_text("phase_id: ci\n")  # no gate_type
+
+        monkeypatch.setenv("GITHUB_WORKSPACE", str(tmp_path))
+        monkeypatch.delenv("EG_GATE_TYPE", raising=False)
+        monkeypatch.delenv("EG_PHASE_ID", raising=False)
+        monkeypatch.delenv("EG_GATE_PRESET", raising=False)
+        monkeypatch.delenv("EG_API_KEY", raising=False)
+
+        with pytest.raises(SystemExit) as exc_info:
+            entrypoint.main()
+        assert exc_info.value.code == 1
+
+
+class TestWarnMode:
+    """QUAL-04: warn mode -- gate failure does not block step, emits warnings.
+
+    These tests are RED until Plan 02 wires warn_mode into entrypoint.main().
+    """
+
+    def test_warn_mode_step_succeeds_when_gate_fails(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """EG_MODE=warn with gate failure does NOT raise SystemExit."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "warn")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["coverage below threshold"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        # warn mode: should NOT raise SystemExit even when gate fails
+        fail_closed_main(entrypoint.main)
+
+        output_text = output.read_text()
+        assert "passed=true" in output_text
+
+    def test_warn_mode_does_not_set_observe_would_pass(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """EG_MODE=warn output does NOT contain observe_would_pass."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "warn")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["coverage below threshold"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        fail_closed_main(entrypoint.main)
+
+        output_text = output.read_text()
+        assert "observe_would_pass" not in output_text
+
+    def test_warn_mode_notice_emitted(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys
+    ) -> None:
+        """EG_MODE=warn with failure emits ::notice with 'warn mode' message."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "warn")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["coverage below threshold"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        fail_closed_main(entrypoint.main)
+
+        captured = capsys.readouterr()
+        assert "::notice" in captured.out
+        assert "warn" in captured.out.lower()
+
+    def test_warn_mode_summary_shows_warn_badge(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """EG_MODE=warn with failure shows WARN badge in step summary."""
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_MODE", "warn")
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {"passed": False, "issues": ["coverage below threshold"], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        fail_closed_main(entrypoint.main)
+
+        summary_text = summary.read_text()
+        assert "WARN" in summary_text
+
+
+class TestAnnotationLevels:
+    """QUAL-02: severity-classified annotations via _emit_annotations.
+
+    Tests verify existing behavior for passed/failed/observe levels,
+    plus RED test for warn_mode param that does not yet exist.
+    """
+
+    def test_annotation_levels_direct_call_passed_uses_warning(self, capsys) -> None:
+        """_emit_annotations with passed=True uses ::warning level."""
+        entrypoint._emit_annotations(["minor issue"], passed=True)
+        captured = capsys.readouterr()
+        assert "::warning" in captured.out
+
+    def test_annotation_levels_direct_call_failed_uses_error(self, capsys) -> None:
+        """_emit_annotations with passed=False uses ::error level."""
+        entrypoint._emit_annotations(["coverage below threshold"], passed=False)
+        captured = capsys.readouterr()
+        assert "::error" in captured.out
+
+    def test_annotation_levels_observe_uses_notice(self, capsys) -> None:
+        """_emit_annotations with observe_mode=True uses ::notice level."""
+        entrypoint._emit_annotations(["issue"], passed=False, observe_mode=True)
+        captured = capsys.readouterr()
+        assert "::notice" in captured.out
+
+    def test_annotation_levels_warn_mode_uses_warning(self, capsys) -> None:
+        """_emit_annotations with warn_mode=True uses ::warning (not ::error).
+
+        RED: This test MUST FAIL until Plan 02 adds warn_mode param to _emit_annotations.
+        Calling with warn_mode=True raises TypeError (unexpected keyword argument).
+        """
+        entrypoint._emit_annotations(
+            ["coverage below threshold"], passed=False, warn_mode=True
+        )
+        captured = capsys.readouterr()
+        assert "::warning" in captured.out
+
+
+class TestSignalHierarchy:
+    """QUAL-05: signal hierarchy -- severity classification and sorted issue table.
+
+    All tests are RED until Plan 03 implements _classify_severity and _write_issues_table.
+    """
+
+    def test_classify_severity_critical_keywords(self) -> None:
+        """_classify_severity maps keywords to correct severity levels.
+
+        RED: AttributeError -- _classify_severity does not yet exist on entrypoint module.
+        """
+        assert entrypoint._classify_severity("build failed") == "Critical"
+        assert entrypoint._classify_severity("coverage below threshold") == "Warning"
+        assert entrypoint._classify_severity("evaluation done") == "Info"
+
+    def test_write_issues_table_sorted_critical_first(self) -> None:
+        """_write_issues_table returns lines with Critical before Warning before Info.
+
+        RED: AttributeError -- _write_issues_table does not yet exist on entrypoint module.
+        """
+        lines = entrypoint._write_issues_table(
+            ["evaluation done", "build failed", "coverage below threshold"], []
+        )
+        text = "\n".join(lines)
+        critical_pos = text.index("Critical")
+        warning_pos = text.index("Warning")
+        info_pos = text.index("Info")
+        assert critical_pos < warning_pos < info_pos
+
+    def test_write_summary_uses_hierarchy_table(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """Full main() call with 'failed' keyword produces summary with '| Critical |' row.
+
+        RED: summary does not yet contain hierarchy table rows.
+        """
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {
+                "passed": False,
+                "issues": ["build failed", "coverage below threshold"],
+                "metadata": {},
+            }
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        summary_text = summary.read_text()
+        assert "| Critical |" in summary_text
+
+
+class TestRetryPrompt:
+    """FEAT-03: _build_retry_prompt for machine-readable remediation output.
+
+    All tests are RED until Wave 3 implements _build_retry_prompt in entrypoint.py.
+    """
+
+    def test_retry_prompt_empty_on_pass(self) -> None:
+        """Passing result produces empty retry_prompt."""
+        result = entrypoint._build_retry_prompt(
+            "sbom", "1a", {"passed": True, "issues": []}
+        )
+        assert result == ""
+
+    def test_retry_prompt_structure_on_failure(self) -> None:
+        """Failing result produces structured retry_prompt with required sections."""
+        result = entrypoint._build_retry_prompt(
+            "sbom",
+            "2b",
+            {"passed": False, "issues": ["File not found: sbom.json"]},
+        )
+        assert "GATE: sbom" in result
+        assert "PHASE: 2b" in result
+        assert "STATUS: FAILED" in result
+        assert "ISSUES:" in result
+        assert "REMEDIATION:" in result
+        assert "RETRY:" in result
+
+    def test_retry_prompt_written_to_output(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """main() writes retry_prompt to GITHUB_OUTPUT on failure."""
+        import re
+
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_TYPE", "skill")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+
+        def _fake_evaluate(**kwargs):
+            return {
+                "passed": False,
+                "issues": ["Evidence missing for gate"],
+                "metadata": {},
+            }
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        output_text = output.read_text()
+        assert "retry_prompt" in output_text
+
+    def test_retry_prompt_preset_aggregation(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """In preset mode, aggregated retry_prompt includes both gates' issues."""
+        import re
+
+        output = tmp_path / "output.txt"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setenv("EG_GATE_PRESET", "web-app-baseline")
+        monkeypatch.setenv("EG_GATE_TYPE", "")
+        monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+        monkeypatch.delenv("EG_API_BASE", raising=False)
+        monkeypatch.delenv("EG_MODE", raising=False)
+        monkeypatch.delenv("EG_STICKY_COMMENT", raising=False)
+
+        eval_count = {"n": 0}
+
+        def _fake_evaluate(**kwargs):
+            eval_count["n"] += 1
+            if eval_count["n"] in (1, 3):
+                return {
+                    "passed": False,
+                    "issues": [f"Issue from gate {eval_count['n']}"],
+                    "metadata": {},
+                }
+            return {"passed": True, "issues": [], "metadata": {}}
+
+        monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
+
+        entrypoint.main()
+
+        output_text = output.read_text()
+        # Aggregated retry_prompt should reference issues from both failing gates
+        match = re.search(
+            r"retry_prompt<<(ghadelimiter_\w+)\n(.*?)\n\1\n",
+            output_text,
+            re.DOTALL,
+        )
+        assert match is not None, "retry_prompt output not found in GITHUB_OUTPUT"
+        prompt_text = match.group(2)
+        assert "Issue from gate 1" in prompt_text or "gate 1" in prompt_text.lower()
+        assert "Issue from gate 3" in prompt_text or "gate 3" in prompt_text.lower()

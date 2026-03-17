@@ -15,11 +15,17 @@ inputs:
     required: false
     default: ""
   gate_type:
-    description: "Gate type to evaluate (e.g., skill, xac, security)"
-    required: true
+    description: "Gate type to evaluate (e.g., skill, xac, security). Can also be set in .evidencegate.yml config file."
+    required: false
+    default: ""
   phase_id:
-    description: "Phase ID (e.g., 1a, 2b)"
-    required: true
+    description: "Phase ID (e.g., 1a, 2b). Can also be set in .evidencegate.yml config file."
+    required: false
+    default: ""
+  config_path:
+    description: "Path to .evidencegate.yml config file. Defaults to GITHUB_WORKSPACE/.evidencegate.yml."
+    required: false
+    default: ""
   evidence_files:
     description: "Comma-separated list of evidence file paths"
     required: false
@@ -37,7 +43,7 @@ inputs:
     required: false
     default: ""
   mode:
-    description: "Execution mode: 'enforce' (default, fail on gate failure) or 'observe' (log results without blocking)"
+    description: "Enforcement mode: 'enforce' (default, fail on gate failure), 'warn' (emit warnings but step succeeds), or 'observe' (shadow mode, log results without blocking)"
     required: false
     default: "enforce"
   debug:
@@ -91,6 +97,9 @@ outputs:
   suggested_actions:
     description: "Human-readable repair steps for failed gates"
     value: ${{ steps.evidence_gate.outputs.suggested_actions }}
+  retry_prompt:
+    description: "Machine-readable remediation instructions for AI agent auto-repair. Empty string when gate passed. Format: GATE/PHASE/STATUS/ISSUES/REMEDIATION/RETRY sections."
+    value: ${{ steps.evidence_gate.outputs.retry_prompt }}
   json_output:
     description: "Full evaluation result as JSON string (use fromJson() to parse)"
     value: ${{ steps.evidence_gate.outputs.json_output }}
@@ -111,6 +120,10 @@ runs:
         key: ${{ runner.os }}-pip-eg-${{ inputs.version }}
         restore-keys: |
           ${{ runner.os }}-pip-eg-
+
+    - name: Install pyyaml
+      shell: bash
+      run: pip install pyyaml
 
     - name: Install evaluator
       if: inputs.version != 'latest' && inputs.version != ''
@@ -134,5 +147,6 @@ runs:
         EG_VERSION: ${{ inputs.version }}
         EG_GATE_PRESET: ${{ inputs.gate_preset }}
         EG_STICKY_COMMENT: ${{ inputs.sticky_comment }}
+        EG_CONFIG_PATH: ${{ inputs.config_path }}
         GITHUB_TOKEN: ${{ github.token }}
       run: python ${{ github.action_path }}/src/entrypoint.py

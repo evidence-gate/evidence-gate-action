@@ -41,9 +41,9 @@ class TestExpandPreset:
         assert "performance" in result
 
     def test_expand_preset_supply_chain(self) -> None:
-        """supply-chain returns 4 gates: security, dependency, compliance, build."""
+        """supply-chain returns 6 gates: security, dependency, compliance, build, sbom, provenance."""
         result = expand_preset("supply-chain")
-        assert result == ["security", "dependency", "compliance", "build"]
+        assert result == ["security", "dependency", "compliance", "build", "sbom", "provenance"]
 
     def test_expand_preset_nemoclaw_baseline(self) -> None:
         """nemoclaw-baseline returns 4 gates: nemoclaw_blueprint, nemoclaw_policy, security, build."""

@@ -19,6 +19,13 @@ import uuid
 from fnmatch import fnmatch
 from urllib.parse import urlencode
 
+from config_loader import (
+    ConfigError,
+    get_config_path,
+    load_config,
+    resolve_config,
+    validate_config,
+)
 from core import (
     collect_evidence_refs,
     evaluate,
@@ -184,6 +191,37 @@ _KEYWORD_PATTERNS: list[tuple[str, str]] = [
 
 _PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
+# Signal hierarchy classification (QUAL-05)
+_CRITICAL_KEYWORDS = frozenset({"fail", "error", "critical", "vulner", "missing", "not found"})
+_WARNING_KEYWORDS = frozenset({"warn", "below", "threshold", "coverage", "deprecated"})
+_SEVERITY_ORDER = {"Critical": 0, "Warning": 1, "Info": 2}
+
+
+def _classify_severity(issue: str) -> str:
+    """Return 'Critical', 'Warning', or 'Info' for a plain-text issue string."""
+    lower = issue.lower()
+    if any(k in lower for k in _CRITICAL_KEYWORDS):
+        return "Critical"
+    if any(k in lower for k in _WARNING_KEYWORDS):
+        return "Warning"
+    return "Info"
+
+
+def _write_issues_table(issues: list[str], lines: list[str]) -> list[str]:
+    """Append a signal-hierarchy-sorted issues table to lines.
+
+    Issues are classified by _classify_severity and sorted Critical > Warning > Info.
+    Modifies lines in-place and returns lines for convenience.
+    """
+    if not issues:
+        return lines
+    classified = [(i, _classify_severity(i)) for i in issues]
+    classified.sort(key=lambda x: _SEVERITY_ORDER[x[1]])
+    lines.extend(["", "| Severity | Issue |", "|----------|-------|"])
+    for issue, severity in classified:
+        lines.append(f"| {severity} | {issue} |")
+    return lines
+
 
 def _extract_issue_code(issue_text: str) -> str:
     """Extract synthetic issue code from plain text using keyword patterns."""
@@ -242,10 +280,12 @@ def _generate_suggested_actions(gate_type: str, result: dict) -> list[str]:
 
 
 def _emit_annotations(
-    issues: list[str], passed: bool, *, observe_mode: bool = False
+    issues: list[str], passed: bool, *, observe_mode: bool = False, warn_mode: bool = False
 ) -> None:
     if observe_mode:
         level = "notice"
+    elif warn_mode:
+        level = "warning"  # Always warning in warn mode regardless of passed state
     else:
         level = "warning" if passed else "error"
     title = "Evidence Gate"
@@ -287,6 +327,7 @@ def _write_summary(
     dashboard_url: str | None,
     mode: str,
     observe_mode: bool = False,
+    warn_mode: bool = False,
 ) -> None:
     metadata = result.get("metadata")
     metadata_dict = metadata if isinstance(metadata, dict) else {}
@@ -300,6 +341,8 @@ def _write_summary(
     heading = _build_heading()
     if observe_mode:
         status_text = "OBSERVE (PASS)" if passed else "OBSERVE (would FAIL)"
+    elif warn_mode:
+        status_text = "WARN (PASS)" if passed else "WARN (would FAIL)"
     else:
         status_text = "PASS" if passed else "FAIL"
 
@@ -326,10 +369,8 @@ def _write_summary(
         lines.append("")
         lines.append("</details>")
 
-    # Major issues (always visible, outside details)
-    if major_issues:
-        lines.extend(["", "### Major Issues"])
-        lines.extend(f"- {issue}" for issue in major_issues)
+    # Signal hierarchy issues table (always visible, outside details) -- QUAL-05
+    _write_issues_table(major_issues, lines)
 
     _append_summary("\n".join(lines))
 
@@ -475,6 +516,41 @@ def _handle_sticky_comment(
     post_sticky_comment(owner, repo, pr_number, token, results, observe_mode)
 
 
+def _build_retry_prompt(gate_type: str, phase_id: str, result: dict) -> str:
+    """Build machine-readable remediation prompt for AI agent auto-repair.
+
+    Returns empty string when gate passed or no actionable issues found.
+    Caps issues at 10 to keep prompt compact.
+    """
+    if result.get("passed", False):
+        return ""
+
+    issues = [str(i) for i in result.get("issues", []) if isinstance(i, str)][:10]
+    actions = _generate_suggested_actions(gate_type, result)
+
+    if not issues and not actions:
+        return ""
+
+    lines = [
+        f"GATE: {gate_type}",
+        f"PHASE: {phase_id}",
+        "STATUS: FAILED",
+        "ISSUES:",
+    ]
+    for issue in issues:
+        lines.append(f"  - {issue}")
+
+    lines.append("REMEDIATION:")
+    for idx, action in enumerate(actions, 1):
+        clean = action.lstrip("- ")
+        if "] " in clean:
+            clean = clean.split("] ", 1)[1]
+        lines.append(f"  {idx}. {clean}")
+
+    lines.append("RETRY: Re-run gate after completing all REMEDIATION steps.")
+    return "\n".join(lines)
+
+
 def _handle_result(
     *,
     result: dict,
@@ -485,6 +561,7 @@ def _handle_result(
     evidence_url: str | None,
     mode: str,
     observe_mode: bool,
+    warn_mode: bool = False,
 ) -> None:
     """Write summary, annotations, and outputs for a single-gate result."""
     # Handle upsell (Free mode + Pro-only gate type)
@@ -503,6 +580,7 @@ def _handle_result(
         _set_output("dashboard_url", dashboard_url or "")
         _set_multiline_output("missing_evidence", json.dumps([]))
         _set_multiline_output("suggested_actions", "")
+        _set_multiline_output("retry_prompt", "")
         _set_multiline_output("json_output", json.dumps(result))
         return
 
@@ -522,10 +600,13 @@ def _handle_result(
         dashboard_url=dashboard_url,
         mode=mode,
         observe_mode=observe_mode,
+        warn_mode=warn_mode,
     )
-    _emit_annotations(issue_list, passed=passed, observe_mode=observe_mode)
+    _emit_annotations(issue_list, passed=passed, observe_mode=observe_mode, warn_mode=warn_mode)
 
-    _set_output("passed", str(passed).lower())
+    # QUAL-04: warn mode reports passed=true in outputs even when gate failed
+    output_passed = True if warn_mode else passed
+    _set_output("passed", str(output_passed).lower())
     _set_output("mode", mode)
     _set_output("run_id", run_id)
     _set_output("trace_url", str(trace_url))
@@ -541,17 +622,44 @@ def _handle_result(
     _set_multiline_output("missing_evidence", json.dumps(missing))
     actions = _generate_suggested_actions(gate_type, result)
     _set_multiline_output("suggested_actions", "\n".join(actions))
+    retry_prompt = _build_retry_prompt(gate_type, result.get("phase_id", ""), result)
+    _set_multiline_output("retry_prompt", retry_prompt)
 
     _set_multiline_output("json_output", json.dumps(result))
 
 
 def main() -> dict:
     """Run Evidence Gate evaluation for GitHub Actions."""
-    gate_type = os.environ.get("EG_GATE_TYPE", "").strip()
-    phase_id = os.environ.get("EG_PHASE_ID", "").strip()
-    gate_preset = os.environ.get("EG_GATE_PRESET", "").strip()
+    # --- Config file loading (CONFIG-01..CONFIG-05) ---
+    env_config_path = os.environ.get("EG_CONFIG_PATH", "").strip()
+    config_path = get_config_path(env_config_path)
+
+    try:
+        file_config = load_config(config_path)
+    except ConfigError:
+        sys.exit(1)
+
+    errors = validate_config(file_config, config_path)
+    if errors:
+        sys.exit(1)
+
+    # Resolve all settings: env > config file > defaults
+    resolved = resolve_config(
+        env_gate_type=os.environ.get("EG_GATE_TYPE", "").strip(),
+        env_phase_id=os.environ.get("EG_PHASE_ID", "").strip(),
+        env_mode=os.environ.get("EG_MODE", "").strip(),
+        env_evidence_files=os.environ.get("EG_EVIDENCE_FILES", "").strip(),
+        env_gate_preset=os.environ.get("EG_GATE_PRESET", "").strip(),
+        env_config_path=env_config_path,
+        file_config=file_config,
+    )
+
+    gate_type = resolved.gate_type
+    phase_id = resolved.phase_id
+    gate_preset = resolved.gate_preset
+    evidence_files_str = resolved.evidence_files
+
     run_id = os.environ.get("EG_RUN_ID", "") or os.environ.get("GITHUB_RUN_ID", "")
-    evidence_files_str = os.environ.get("EG_EVIDENCE_FILES", "")
     github_run_url = _github_run_url()
     dashboard_url = _build_dashboard_url(run_id or None)
     evidence_url = os.environ.get("EG_EVIDENCE_URL", "").strip() or dashboard_url
@@ -587,11 +695,17 @@ def main() -> dict:
     mode = _detect_mode(api_key)
 
     # Observe mode detection
-    observe_mode = os.environ.get("EG_MODE", "enforce").lower() == "observe"
+    observe_mode = resolved.mode.lower() == "observe"
+    warn_mode = resolved.mode.lower() == "warn"
     if observe_mode:
         print(
             "::notice title=Evidence Gate::"
             "Running in observe mode -- failures will not block this step"
+        )
+    if warn_mode:
+        print(
+            "::notice title=Evidence Gate::"
+            "Running in warn mode -- failures will not block this step"
         )
 
     # Debug logging (DX-03)
@@ -634,16 +748,24 @@ def main() -> dict:
                 dashboard_url=dashboard_url,
                 mode=mode,
                 observe_mode=observe_mode,
+                warn_mode=warn_mode,
             )
 
         # Aggregate results
         all_passed = all(r.get("passed", False) for r in results)
+        # QUAL-04: warn mode always succeeds (step exit 0)
+        if warn_mode:
+            all_passed = True
         all_missing: list[dict] = []
         all_actions: list[str] = []
+        all_retry_prompts: list[str] = []
         for r in results:
             all_missing.extend(_extract_missing_evidence(r))
             all_actions.extend(
                 _generate_suggested_actions(r.get("gate_type", ""), r)
+            )
+            all_retry_prompts.append(
+                _build_retry_prompt(r.get("gate_type", ""), r.get("phase_id", ""), r)
             )
 
         # Set outputs
@@ -656,6 +778,8 @@ def main() -> dict:
             _set_output("observe_would_pass", str(all_passed).lower())
         _set_multiline_output("missing_evidence", json.dumps(all_missing))
         _set_multiline_output("suggested_actions", "\n".join(all_actions))
+        combined_retry = "\n\n---\n\n".join(p for p in all_retry_prompts if p)
+        _set_multiline_output("retry_prompt", combined_retry)
         _set_multiline_output("json_output", json.dumps(results))
 
         # Sticky comment
@@ -686,11 +810,16 @@ def main() -> dict:
         evidence_url=evidence_url,
         mode=mode,
         observe_mode=observe_mode,
+        warn_mode=warn_mode,
     )
 
     # Sticky comment (single gate)
     _handle_sticky_comment([result], observe_mode)
 
+    # QUAL-04: warn mode always succeeds (step exit 0)
+    if warn_mode and not result.get("passed", True):
+        result = dict(result)
+        result["passed"] = True
     return result
 
 
