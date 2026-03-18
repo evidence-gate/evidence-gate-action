@@ -2,9 +2,9 @@
 
 # Evidence Gate Action
 
-Fail-closed quality gates for GitHub Actions with audit-grade evidence chains.
+Fail-closed quality gates for GitHub Actions with verifiable evidence chains.
 
-**AI writes your code and your tests. How do you prove quality to an auditor?** Evidence Gate evaluates pipeline artifacts against quality criteria, blocks merges that fail, and records every evaluation as tamper-proof evidence (L1 declarations through L4 SHA-256 hash chains). **Blind Gates** hide the pass/fail criteria so AI agents cannot reverse-engineer or game them.
+**AI writes your code and your tests. How do you prove quality to an auditor?** Evidence Gate evaluates pipeline artifacts against quality criteria, blocks merges that fail, and records every evaluation as tamper-proof evidence (L1 declarations through L4 SHA-256 hash chains). **Blind Gates** hide the pass/fail criteria, making it harder for AI agents to reverse-engineer or game them.
 
 This is a CI/CD quality gate enforcement tool -- not an AI code reviewer and not an AI agent guardrail. Multiple unrelated projects share the name "Evidence Gate" on GitHub -- this one enforces quality in your CI/CD pipeline.
 
@@ -38,7 +38,7 @@ Enterprise uses the same action with a custom `api_base` for self-hosted deploym
 
 ## When to Use This
 
-- **AI-assisted development** -- when LLMs generate both code and tests, traditional coverage metrics prove nothing; Blind Gates are the structural fix
+- **AI-assisted development** -- when LLMs generate both code and tests, traditional coverage metrics prove nothing; Blind Gates are a structural approach to this problem
 - **Audit & compliance** -- keep verifiable records of every quality gate decision (SOC 2, ISO 27001, EU AI Act, Japan AI guidelines)
 - **Deployment gating** -- block deployment unless quality evidence is present and valid
 - **Multi-gate pipelines** -- run coverage, security, and build gates in sequence with a single action
@@ -522,7 +522,7 @@ When AI agents (Copilot, Claude, Cursor) generate both production code and tests
 
 Evidence Gate addresses this with three design choices:
 
-1. **Blind Gates** -- evaluation criteria are hidden from the pipeline, so AI agents cannot reverse-engineer or optimize against them. This is the only structural solution to the gate-gaming problem in AI-driven development.
+1. **Blind Gates** -- evaluation criteria are hidden from the pipeline, making it harder for AI agents to reverse-engineer or optimize against them. This is a structural approach to the gate-gaming problem in AI-driven development.
 
 2. **Evidence Trust Levels** -- every evaluation is recorded at one of four trust levels:
    - **L1** Declaration -- the pipeline claims something happened
