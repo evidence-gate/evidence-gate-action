@@ -516,6 +516,12 @@ evidence_files:
 - [ ] Optional: add `mode: warn` to non-critical gates for gradual rollout
 - [ ] Optional: add `sticky_comment: true` to aggregate PR feedback
 
+## Architecture
+
+<p align="center">
+  <img src="docs/architecture.svg" alt="Evidence Gate Action architecture diagram" width="800">
+</p>
+
 ## Why This Exists
 
 When AI agents (Copilot, Claude, Cursor) generate both production code and tests, traditional CI/CD gates lose their meaning. An LLM told to "achieve 80% coverage" will produce tests that hit exactly 80.1% -- a number that satisfies the metric but proves nothing about quality.

@@ -516,6 +516,12 @@ evidence_files:
 - [ ] 任意: 段階的なロールアウトのために重要でないゲートに `mode: warn` を追加
 - [ ] 任意: PR フィードバックを集約するために `sticky_comment: true` を追加
 
+## アーキテクチャ
+
+<p align="center">
+  <img src="docs/architecture.svg" alt="Evidence Gate Action アーキテクチャ図" width="800">
+</p>
+
 ## このプロジェクトが存在する理由
 
 AI エージェント（Copilot、Claude、Cursor）が本番コードとテストの両方を生成する場合、従来の CI/CD ゲートはその意味を失います。「80% のカバレッジを達成せよ」と指示された LLM は、ちょうど 80.1% に到達するテストを生成します。これは指標を満たす数値ですが、品質について何も証明しません。
