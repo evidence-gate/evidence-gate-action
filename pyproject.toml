@@ -19,6 +19,6 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
+    "pytest>=9.0.3",
     "pyyaml>=6.0.3",
 ]
