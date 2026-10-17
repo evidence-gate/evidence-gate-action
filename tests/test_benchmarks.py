@@ -1,4 +1,5 @@
 """Tests that BENCHMARKS.md exists and contains required sections."""
+
 import pathlib
 
 BENCHMARKS = pathlib.Path(__file__).parent.parent / "BENCHMARKS.md"

@@ -89,17 +89,11 @@ def _post(path: str, body: dict[str, Any]) -> dict[str, Any]:
             detail = error_body.get("detail", error_body.get("error", str(exc)))
         except Exception:
             detail = str(exc)
-        raise EvidenceGateError(
-            f"API error {exc.code} on {path}: {detail}"
-        ) from exc
+        raise EvidenceGateError(f"API error {exc.code} on {path}: {detail}") from exc
     except URLError as exc:
-        raise EvidenceGateError(
-            f"Network error on {path}: {exc.reason}"
-        ) from exc
+        raise EvidenceGateError(f"Network error on {path}: {exc.reason}") from exc
     except Exception as exc:
-        raise EvidenceGateError(
-            f"Unexpected error on {path}: {type(exc).__name__}"
-        ) from exc
+        raise EvidenceGateError(f"Unexpected error on {path}: {type(exc).__name__}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -220,20 +214,14 @@ def fail_closed_main(main_fn: Any) -> None:
             passed = result.get("passed", False)
             if not passed:
                 if observe:
-                    print(
-                        "EVIDENCE GATE: Quality gate FAILED "
-                        "(observe mode -- not blocking)"
-                    )
+                    print("EVIDENCE GATE: Quality gate FAILED (observe mode -- not blocking)")
                     return
                 print("EVIDENCE GATE: Quality gate FAILED", file=sys.stderr)
                 sys.exit(1)
             print("EVIDENCE GATE: Quality gate PASSED")
         elif result is False:
             if observe:
-                print(
-                    "EVIDENCE GATE: Quality gate FAILED "
-                    "(observe mode -- not blocking)"
-                )
+                print("EVIDENCE GATE: Quality gate FAILED (observe mode -- not blocking)")
                 return
             print("EVIDENCE GATE: Quality gate FAILED", file=sys.stderr)
             sys.exit(1)
@@ -245,9 +233,7 @@ def fail_closed_main(main_fn: Any) -> None:
         sys.exit(1)
     except Exception as exc:
         if observe:
-            print(
-                f"EVIDENCE GATE OBSERVE UNEXPECTED: {type(exc).__name__}"
-            )
+            print(f"EVIDENCE GATE OBSERVE UNEXPECTED: {type(exc).__name__}")
             return
         print(
             f"EVIDENCE GATE UNEXPECTED ERROR: {type(exc).__name__}",
@@ -260,15 +246,18 @@ def fail_closed_main(main_fn: Any) -> None:
 # Self-integrity hash (computed over canonical content)
 # ---------------------------------------------------------------------------
 
+
 def _compute_core_sha256() -> str:
     """Compute SHA-256 of this module excluding CORE_VERSION/CORE_SHA256 lines."""
     import inspect
+
     source_file = inspect.getfile(sys.modules[__name__])
     with open(source_file, "rb") as f:
         lines = f.readlines()
     # Exclude lines that define CORE_VERSION and CORE_SHA256
     canonical = b"".join(
-        line for line in lines
+        line
+        for line in lines
         if not line.strip().startswith(b"CORE_VERSION")
         and not line.strip().startswith(b"CORE_SHA256")
     )

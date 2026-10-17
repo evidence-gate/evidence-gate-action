@@ -93,16 +93,10 @@ def load_config(config_path: str) -> dict[str, Any]:
     except yaml.YAMLError as exc:
         line = 1
         problem = str(getattr(exc, "problem", exc))
-        suggestion = (
-            "Check for tabs (use spaces), unquoted colons, "
-            "or incorrect indentation."
-        )
+        suggestion = "Check for tabs (use spaces), unquoted colons, or incorrect indentation."
         if hasattr(exc, "problem_mark") and exc.problem_mark is not None:
             line = exc.problem_mark.line + 1  # Convert 0-based to 1-based
-        print(
-            f"::error file={config_path},line={line}::"
-            f"YAML syntax error: {problem}. {suggestion}"
-        )
+        print(f"::error file={config_path},line={line}::YAML syntax error: {problem}. {suggestion}")
         raise ConfigError(f"YAML syntax error in {config_path}") from exc
 
 
@@ -116,30 +110,21 @@ def validate_config(config: dict[str, Any], config_path: str) -> list[str]:
 
     for key in config:
         if key not in VALID_TOP_LEVEL_KEYS:
-            msg = (
-                f"Unknown key '{key}'. "
-                f"Valid keys: {', '.join(sorted(VALID_TOP_LEVEL_KEYS))}"
-            )
+            msg = f"Unknown key '{key}'. Valid keys: {', '.join(sorted(VALID_TOP_LEVEL_KEYS))}"
             print(f"::error file={config_path},line=1::{msg}")
             errors.append(msg)
 
     if "mode" in config:
         mode_val = config["mode"]
         if mode_val not in VALID_MODES:
-            msg = (
-                f"Invalid mode '{mode_val}'. "
-                f"Valid values: {', '.join(sorted(VALID_MODES))}"
-            )
+            msg = f"Invalid mode '{mode_val}'. Valid values: {', '.join(sorted(VALID_MODES))}"
             print(f"::error file={config_path},line=1::{msg}")
             errors.append(msg)
 
     if "version" in config:
         version_val = config["version"]
         if version_val not in (1, "1"):
-            msg = (
-                f"Unsupported config version '{version_val}'. "
-                "Only version: 1 is supported."
-            )
+            msg = f"Unsupported config version '{version_val}'. Only version: 1 is supported."
             print(f"::error file={config_path},line=1::{msg}")
             errors.append(msg)
 

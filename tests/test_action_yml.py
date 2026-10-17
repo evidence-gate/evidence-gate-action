@@ -76,9 +76,7 @@ class TestActionYml:
     def test_action_yml_outputs_include_mode(self) -> None:
         """mode output must exist for Free/Pro/Enterprise detection."""
         data = _load_action()
-        assert "mode" in data["outputs"], (
-            f"'mode' not in outputs: {list(data['outputs'].keys())}"
-        )
+        assert "mode" in data["outputs"], f"'mode' not in outputs: {list(data['outputs'].keys())}"
         mode_desc = data["outputs"]["mode"]["description"]
         assert mode_desc, "mode output must have a non-empty description"
 
@@ -116,9 +114,7 @@ class TestActionYml:
     def test_pip_install_step_exists(self) -> None:
         """action.yml must install its pinned runtime dependency (pyyaml)."""
         raw = _load_raw()
-        assert "pip install" in raw, (
-            "action.yml must contain a 'pip install' step for pyyaml"
-        )
+        assert "pip install" in raw, "action.yml must contain a 'pip install' step for pyyaml"
 
 
 class TestConfigFileInput:
@@ -189,9 +185,7 @@ class TestREADMEStructure:
         Must be a dedicated section, not just incidental mentions in other tables.
         """
         content = README_PATH.read_text(encoding="utf-8")
-        has_visual_section = (
-            "## Visual Proof" in content or "## Output Examples" in content
-        )
+        has_visual_section = "## Visual Proof" in content or "## Output Examples" in content
         assert has_visual_section, (
             "README must contain a dedicated Visual Proof section "
             "(either '## Visual Proof' or '## Output Examples') "

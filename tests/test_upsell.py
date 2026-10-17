@@ -40,9 +40,7 @@ class TestUpsellEntrypoint:
         assert "Upgrade" in summary.read_text()
         assert "upsell=true" in output.read_text()
 
-    def test_free_gate_no_upsell(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_free_gate_no_upsell(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """Free gate type does not produce upsell."""
         monkeypatch.delenv("EG_API_KEY")
         monkeypatch.delenv("EG_API_BASE", raising=False)
@@ -96,9 +94,7 @@ class TestUpsellEntrypoint:
         assert PRICING_URL in result.get("upsell_message", "")
         assert PRICING_URL in summary.read_text()
 
-    def test_upsell_exits_zero(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_upsell_exits_zero(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """Upsell triggered gate does NOT fail (passed=true, no SystemExit)."""
         monkeypatch.delenv("EG_API_KEY")
         monkeypatch.delenv("EG_API_BASE", raising=False)

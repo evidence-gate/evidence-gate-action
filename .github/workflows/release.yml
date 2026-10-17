@@ -1,5 +1,5 @@
 name: Update Major Release Tag
-on:
+"on":
   release:
     types: [published]
 

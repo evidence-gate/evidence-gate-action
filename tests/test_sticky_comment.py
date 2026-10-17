@@ -137,9 +137,7 @@ class TestPostStickyComment:
 class TestGetPrContext:
     """Tests for _get_pr_context."""
 
-    def test_get_pr_context_from_event(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_get_pr_context_from_event(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """Extracts owner, repo, pr_number from event JSON."""
         event_data = {"pull_request": {"number": 7}}
         event_file = tmp_path / "event.json"
@@ -150,9 +148,7 @@ class TestGetPrContext:
         result = _get_pr_context()
         assert result == ("myorg", "myrepo", 7)
 
-    def test_get_pr_context_non_pr_event(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_get_pr_context_non_pr_event(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """Returns None when event is not a pull_request."""
         event_data = {"action": "push", "ref": "refs/heads/main"}
         event_file = tmp_path / "event.json"
