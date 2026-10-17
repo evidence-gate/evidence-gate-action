@@ -6,10 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-17
+
 ### Changed
 
-- The hosted API (Pro) is not launched yet: the Free-mode notice for Pro-only gate types now says Pro is coming soon (no upgrade/sign-up prompt), and the step-summary heading is "Pro (hosted API) coming soon". Behaviour is unchanged (warning annotation, `passed=true`, `upsell=true`). README and `action.yml` descriptions mark Pro/hosted API as coming soon.
-- **Breaking:** unknown `gate_type` values now fail in Free mode (they previously passed). Release this as a new minor or major tag. Do not move the existing `v1` tag.
+- The hosted API (Pro) is not launched yet: the Free-mode notice for Pro-only gate types now says Pro is coming soon (no upgrade/sign-up prompt), and the step-summary heading is "Pro (hosted API) coming soon". Behaviour is unchanged (warning annotation, `passed=true`, `upsell=true`). README and `action.yml` descriptions mark Pro/hosted API as coming soon. (#5)
+
+### Fixed
+
+- `integration.yml` is valid again (GitHub had rejected it before any job started); the `on` key in workflows is quoted, and the Python sources pass `ruff format --check`. No change to evaluation behaviour. (#4)
+- `pyproject.toml` / `uv.lock` project version now matches the release (was `1.0.0`).
+
+## [2.0.0] - 2026-10-17
+
+### Changed
+
+- **Breaking:** unknown `gate_type` values now fail in Free mode (they previously passed). Released as a new major version (`v2.0.0`, floating `v2`); the existing `v1` tag was not moved.
 
 ### Fixed
 
@@ -30,3 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Workflow annotations (warnings for Pro-only gate types in Free mode)
 - Fail-closed error handling
 - Comprehensive input/output interface via `action.yml`
+
+[Unreleased]: https://github.com/evidence-gate/evidence-gate-action/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/evidence-gate/evidence-gate-action/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/evidence-gate/evidence-gate-action/compare/v1.1.0...v2.0.0
