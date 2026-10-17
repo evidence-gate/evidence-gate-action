@@ -27,9 +27,11 @@ GitHub Actions 向けのフェイルクローズド品質ゲート。検証可�
 
 ## 必要なもの
 
-| | Free | Pro / Enterprise |
+> **ホスティング版API（Pro）は現在準備中です。公開時期は追ってお知らせします。** Free モード（ローカル評価・API キー不要）は現在ご利用いただけます。Pro/Enterprise の API キーはまだ発行しておらず、`api.evidence-gate.dev` は現時点では利用できません。
+
+| | Free（提供中） | Pro / Enterprise（準備中） |
 |---|---|---|
-| **API キー** | 不要 | `api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}` |
+| **API キー** | 不要 | `api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}`（未発行） |
 | **実行内容** | ローカル検証（ファイル存在確認、JSON スキーマ、数値しきい値） | ホスト型評価（Blind Gates、エビデンスチェーン (L4)、品質状態） |
 | **月間評価回数** | 100 | 5,000+ |
 | **最適な用途** | オープンソースプロジェクト、基本的なエビデンスチェック | 監査証跡、コンプライアンスワークフロー、AI 駆動パイプラインを必要とするチーム |
@@ -49,7 +51,7 @@ Enterprise は同じアクションにカスタム `api_base` を指定するこ
 |------|:----------:|:--------:|:----------:|:---------------:|
 | 基本的なゲート評価 | `read` | -- | -- | -- |
 | Check Run アノテーション | `read` | `write` | -- | -- |
-| OIDC キーレス認証 (Pro) | `read` | -- | `write` | -- |
+| OIDC キーレス認証 (Pro、準備中) | `read` | -- | `write` | -- |
 | PR スティッキーコメント | `read` | -- | -- | `write` |
 
 Check Run をサポートする一般的なワークフロー：
@@ -76,8 +78,8 @@ jobs:
 | `gate_type` | いいえ | `""` | 評価するゲートタイプ（例: `test_coverage`、`security`、`build`、`skill`）。`.evidencegate.yml` がある場合は省略可能 |
 | `phase_id` | いいえ | `""` | フェーズ識別子（例: `build`、`test`、`deploy`）。`.evidencegate.yml` がある場合は省略可能 |
 | `evidence_files` | いいえ | `""` | エビデンスファイルパスのカンマ区切りリスト |
-| `api_key` | いいえ | `""` | Evidence Gate API キー。Free モードでは省略 |
-| `api_base` | いいえ | `https://api.evidence-gate.dev` | API ベース URL。セルフホスト Enterprise の場合に変更 |
+| `api_key` | いいえ | `""` | Evidence Gate API キー。Free モードでは省略。ホスティング版API（Pro）は準備中のため、キーは未発行です |
+| `api_base` | いいえ | `https://api.evidence-gate.dev` | API ベース URL（`api_key` 設定時のみ使用）。デフォルト URL のホスティング版API は準備中で、現在は利用できません。セルフホスト Enterprise の場合に変更 |
 | `mode` | いいえ | `enforce` | `enforce`（ゲート失敗時にステップを失敗させる）または `observe`（結果をログに記録するがブロックしない） |
 | `gate_preset` | いいえ | `""` | 名前付きゲートバンドル（`web-app-baseline`、`enterprise-compliance`、`api-service`、`supply-chain`）。プリセット内のすべてのゲートを実行 |
 | `sticky_comment` | いいえ | `false` | 結果を単一の自動更新 PR コメントに集約。`pull-requests: write` が必要 |
@@ -309,6 +311,8 @@ jobs:
 
 ### AI エージェントによる品質指標の不正操作を防止する
 
+> **準備中:** Blind Gates はホスティング版API（Pro）が必要です。ホスティング版API（Pro）は現在準備中です。以下は提供開始後の利用例です。
+
 Blind Gates は評価基準をパイプラインの外部に保持するため、コードを生成した AI はしきい値を見ることも不正に攻略することもできません。`skill` ゲートタイプは、隠された基準によるスキル評価が主要なユースケースであるためここで使用されています：
 
 ```yaml
@@ -466,7 +470,7 @@ v1.1.0 はほとんどのユーザーにとって**後方互換**です。既存
 
 セルフホスト Enterprise でカスタム `api_base` を使用している場合、対応は不要です。カスタム URL がデフォルトを上書きします。
 
-以前の**デフォルト URL** `https://api.evidence-gate.com` に依存していた場合、`https://api.evidence-gate.dev` に変更されました。Free および Pro ユーザーは影響を受けません。デフォルト URL の変更は自動的に適用されます。
+以前の**デフォルト URL** `https://api.evidence-gate.com` に依存していた場合、`https://api.evidence-gate.dev` に変更されました。Free ユーザーは影響を受けません（ホスティング版API（Pro）は現在準備中です）。デフォルト URL の変更は自動的に適用されます。
 
 ### 変更前 / 変更後
 
@@ -547,12 +551,14 @@ Evidence Gate はこの問題に対して3つの設計方針で対処します�
 | モード | 設定 | 動作 |
 |--------|------|------|
 | **Free** | `api_key` なし | クライアントサイド評価: ファイル存在確認、JSON 検証、スキーマチェック、数値しきい値 |
-| **Pro** | `api_key` を設定 | フル SaaS 評価: Blind Gate、品質状態、エビデンスチェーン (L4)、修復 |
-| **Enterprise** | `api_key` + カスタム `api_base` | 自社インフラでの Pro と同等のセルフホスト |
+| **Pro**（準備中） | `api_key` を設定 | フル SaaS 評価: Blind Gate、品質状態、エビデンスチェーン (L4)、修復。ホスティング版API は現在準備中です |
+| **Enterprise**（準備中） | `api_key` + カスタム `api_base` | 自社インフラでの Pro と同等のセルフホスト。現在販売しておりません |
 
 ## Free vs Pro
 
-| 機能 | Free | Pro / Enterprise |
+ホスティング版API（Pro）は現在準備中です。Pro / Enterprise 列は提供予定の機能です。
+
+| 機能 | Free | Pro / Enterprise（準備中） |
 |------|:----:|:----------------:|
 | 月間ゲート評価回数 | 100 | 5,000+ |
 | 全25ゲートタイプ | はい | はい |
@@ -574,11 +580,7 @@ Evidence Gate はこの問題に対して3つの設計方針で対処します�
 
 ### 「Gate type requires Pro plan」の警告
 
-Pro 限定のゲートタイプを `api_key` なしで使用しています。API キーを追加してください：
-
-```yaml
-api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
-```
+Pro 限定のゲートタイプ（`blind_gate`、`quality_state`、`remediation`、`composite`、`wave`）を `api_key` なしで使用しています。ホスティング版API（Pro）は現在準備中で API キーは未発行のため、これらのゲートタイプは現時点では評価できません。ステップは失敗しません。当面は Free のゲートタイプをご利用ください。お問い合わせ: info@allnew.work
 
 ### エビデンスファイルが見つからない
 
@@ -588,6 +590,8 @@ api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
 
 ### API 接続エラー (Pro/Enterprise)
 
+`https://api.evidence-gate.dev` のホスティング版API（Pro）は現在準備中で利用できません。セルフホストの `api_base` を指定せずに `api_key` を設定すると失敗します（フェイルクローズド）。
+
 1. **API キーの確認**: リポジトリの Secrets に `EVIDENCE_GATE_API_KEY` が設定されていることを確認してください。
 2. **API ベース URL の確認**: Enterprise の場合、GitHub Actions ランナーから `api_base` に到達可能であることを確認してください。
 
@@ -595,8 +599,7 @@ api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
 
 ## リンク
 
-- [ランディングページと料金](https://evidence-gate.dev)
-- [ドキュメント](https://evidence-gate.dev/docs/)
+- [ランディングページ](https://evidence-gate.dev/ja/)
 - [変更履歴](CHANGELOG.md)
 
 ## ライセンス

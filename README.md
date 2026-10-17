@@ -27,9 +27,11 @@ If the evidence is valid, the step passes. If the evidence is missing or invalid
 
 ## What You Need
 
-| | Free | Pro / Enterprise |
+> **The hosted API (Pro) is coming soon.** Free mode (local evaluation, no API key) is available now. Pro/Enterprise API keys are not issued yet; `api.evidence-gate.dev` is not a working endpoint at this time.
+
+| | Free (available now) | Pro / Enterprise (coming soon) |
 |---|---|---|
-| **API key** | Not required | `api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}` |
+| **API key** | Not required | `api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}` (not issued yet) |
 | **What runs** | Local validation (file existence, JSON schema, numeric thresholds) | Hosted evaluation with Blind Gates, evidence chains (L4), quality state |
 | **Evaluations/month** | 100 | 5,000+ |
 | **Best for** | Open-source projects, basic evidence checks | Teams needing audit trails, compliance workflows, AI-driven pipelines |
@@ -49,7 +51,7 @@ Enterprise uses the same action with a custom `api_base` for self-hosted deploym
 |---------|:----------:|:--------:|:----------:|:---------------:|
 | Basic gate evaluation | `read` | -- | -- | -- |
 | Check Run annotations | `read` | `write` | -- | -- |
-| OIDC keyless auth (Pro) | `read` | -- | `write` | -- |
+| OIDC keyless auth (Pro, coming soon) | `read` | -- | `write` | -- |
 | Sticky PR comments | `read` | -- | -- | `write` |
 
 A typical workflow with Check Run support:
@@ -76,8 +78,8 @@ jobs:
 | `gate_type` | No | `""` | Gate type to evaluate (e.g., `test_coverage`, `security`, `build`, `skill`). Optional if `.evidencegate.yml` is present |
 | `phase_id` | No | `""` | Phase identifier (e.g., `build`, `test`, `deploy`). Optional if `.evidencegate.yml` is present |
 | `evidence_files` | No | `""` | Comma-separated list of evidence file paths |
-| `api_key` | No | `""` | Evidence Gate API key. Omit for Free mode |
-| `api_base` | No | `https://api.evidence-gate.dev` | API base URL. Change for self-hosted Enterprise |
+| `api_key` | No | `""` | Evidence Gate API key. Omit for Free mode. The hosted API (Pro) is coming soon; keys are not issued yet |
+| `api_base` | No | `https://api.evidence-gate.dev` | API base URL, used only when `api_key` is set. The hosted API at this default URL is coming soon (not yet available). Change for self-hosted Enterprise |
 | `mode` | No | `enforce` | `enforce` (fail on gate failure) or `observe` (log results without blocking) |
 | `gate_preset` | No | `""` | Named gate bundle (`web-app-baseline`, `enterprise-compliance`, `api-service`, `supply-chain`). Runs all gates in the preset |
 | `sticky_comment` | No | `false` | Aggregate results into a single updating PR comment. Requires `pull-requests: write` |
@@ -309,6 +311,8 @@ jobs:
 
 ### Prevent AI agents from gaming your quality metrics
 
+> **Coming soon:** Blind Gates require the hosted API (Pro), which is not yet available. The example below shows the planned usage.
+
 Blind Gates keep evaluation criteria outside the pipeline -- the AI that generated the code cannot see or game the thresholds. The `skill` gate type is used here because skill evaluations are the primary use case for hidden criteria:
 
 ```yaml
@@ -466,7 +470,7 @@ v1.1.0 is **backwards-compatible** for most users. Existing workflows continue t
 
 If you use self-hosted Enterprise with a custom `api_base`, no action is needed -- your custom URL overrides the default.
 
-If you previously relied on the **default URL** `https://api.evidence-gate.com`, it has changed to `https://api.evidence-gate.dev`. Free and Pro users are unaffected -- the default URL change happens automatically.
+If you previously relied on the **default URL** `https://api.evidence-gate.com`, it has changed to `https://api.evidence-gate.dev`. Free users are unaffected -- the default URL change happens automatically. (The hosted API (Pro) is coming soon.)
 
 ### Before / After
 
@@ -547,12 +551,14 @@ This is an open-source project under active development. We welcome feedback, co
 | Mode | Config | What It Does |
 |------|--------|-------------|
 | **Free** | No `api_key` | Client-side evaluation: file existence, JSON validation, schema checks, numeric thresholds |
-| **Pro** | `api_key` set | Full SaaS evaluation: Blind Gate, Quality State, evidence chains (L4), remediation |
-| **Enterprise** | `api_key` + custom `api_base` | Self-hosted with the same Pro features in your own infrastructure |
+| **Pro** (coming soon) | `api_key` set | Full SaaS evaluation: Blind Gate, Quality State, evidence chains (L4), remediation. The hosted API is not yet available |
+| **Enterprise** (coming soon) | `api_key` + custom `api_base` | Self-hosted with the same Pro features in your own infrastructure. Not yet on sale |
 
 ## Free vs Pro
 
-| Feature | Free | Pro / Enterprise |
+The hosted API (Pro) is coming soon. The Pro / Enterprise column describes planned features.
+
+| Feature | Free | Pro / Enterprise (coming soon) |
 |---------|:----:|:----------------:|
 | Gate evaluations/month | 100 | 5,000+ |
 | All 25 gate types | Yes | Yes |
@@ -574,11 +580,7 @@ This is an open-source project under active development. We welcome feedback, co
 
 ### "Gate type requires Pro plan" warning
 
-You are using a Pro-only gate type without an `api_key`. Add your API key:
-
-```yaml
-api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
-```
+You are using a Pro-only gate type (`blind_gate`, `quality_state`, `remediation`, `composite`, `wave`) without an `api_key`. The hosted API (Pro) is coming soon and API keys are not issued yet, so these gate types cannot be evaluated today. The step does not fail; use a Free gate type in the meantime. Questions: info@allnew.work
 
 ### Evidence file not found
 
@@ -588,6 +590,8 @@ api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}
 
 ### API connection errors (Pro/Enterprise)
 
+The hosted API (Pro) at `https://api.evidence-gate.dev` is coming soon and is not yet available, so setting `api_key` without a self-hosted `api_base` will fail (fail-closed).
+
 1. **Check your API key**: Ensure `EVIDENCE_GATE_API_KEY` is set in repository secrets.
 2. **Verify the API base URL**: For Enterprise, confirm `api_base` is reachable from GitHub Actions runners.
 
@@ -595,8 +599,7 @@ The action uses **fail-closed** semantics: any unhandled error exits non-zero. T
 
 ## Links
 
-- [Landing Page & Pricing](https://evidence-gate.dev)
-- [Documentation](https://evidence-gate.dev/docs/)
+- [Landing Page](https://evidence-gate.dev)
 - [Changelog](CHANGELOG.md)
 
 ## License

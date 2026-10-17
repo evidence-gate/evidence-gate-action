@@ -7,7 +7,7 @@ Provides local evaluation without an API key. Supports:
 - SHA-256 integrity hashes
 
 Pro-only gate types (blind_gate, quality_state, remediation, composite, wave)
-produce a warning-level upsell result instead of failure.
+produce a warning-level "coming soon" notice instead of failure.
 
 Uses only stdlib -- no third-party dependencies.
 """
@@ -770,8 +770,8 @@ def evaluate_local(
             "issues": [],
             "upsell": True,
             "upsell_message": (
-                f"'{gate_type}' requires a Pro plan. "
-                f"Upgrade at {PRICING_URL} to unlock advanced gate types."
+                f"'{gate_type}' requires a Pro plan (hosted API), which is "
+                f"coming soon and not yet available. See {PRICING_URL} for status."
             ),
         }
 

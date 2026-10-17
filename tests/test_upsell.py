@@ -37,7 +37,7 @@ class TestUpsellEntrypoint:
 
         assert result["upsell"] is True
         assert result["passed"] is True
-        assert "Upgrade" in summary.read_text()
+        assert "coming soon" in summary.read_text()
         assert "upsell=true" in output.read_text()
 
     def test_free_gate_no_upsell(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -93,6 +93,8 @@ class TestUpsellEntrypoint:
         result = entrypoint.main()
         assert PRICING_URL in result.get("upsell_message", "")
         assert PRICING_URL in summary.read_text()
+        assert "coming soon" in summary.read_text()
+        assert "Upgrade Available" not in summary.read_text()
 
     def test_upsell_exits_zero(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """Upsell triggered gate does NOT fail (passed=true, no SystemExit)."""
