@@ -258,6 +258,8 @@ class TestProUpsell:
         assert result["passed"] is True
         assert result["mode"] == "free"
         assert "Pro plan" in result["upsell_message"]
+        assert "coming soon" in result["upsell_message"]
+        assert "Upgrade at" not in result["upsell_message"]
 
     def test_free_gate_type_no_upsell(self) -> None:
         result = evaluate_local(gate_type="skill", phase_id="1a")

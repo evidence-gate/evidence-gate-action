@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The hosted API (Pro) is not launched yet: the Free-mode notice for Pro-only gate types now says Pro is coming soon (no upgrade/sign-up prompt), and the step-summary heading is "Pro (hosted API) coming soon". Behaviour is unchanged (warning annotation, `passed=true`, `upsell=true`). README and `action.yml` descriptions mark Pro/hosted API as coming soon.
 - **Breaking:** unknown `gate_type` values now fail in Free mode (they previously passed). Release this as a new minor or major tag. Do not move the existing `v1` tag.
 
 ### Fixed

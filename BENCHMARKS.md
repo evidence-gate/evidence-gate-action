@@ -22,7 +22,7 @@ This document describes the accuracy characteristics of each Evidence Gate gate 
 
 ### provenance gate
 
-- Does not cryptographically verify Sigstore signature (Free mode -- Pro plan includes `gh attestation verify` integration)
+- Does not cryptographically verify Sigstore signature (Free mode -- `gh attestation verify` integration is planned for the Pro plan, which is coming soon)
 - Does not verify builder.id refers to a trusted builder
 - Does not verify claimed digest matches actual artifact
 - SLSA v0.1 provenance (predicateType: https://slsa.dev/provenance/v0.1) uses different predicate structure -- detected and warned but not failed
@@ -34,7 +34,7 @@ Evidence Gate's Free mode performs structural validation -- it is a format and c
 1. A passing sbom gate tells you that a correctly-formatted SBOM exists; it does not tell you the SBOM is accurate.
 2. A passing provenance gate tells you that a structurally valid provenance file exists; it does not tell you the build was performed by a trusted builder.
 
-Upgrade to Pro to unlock cryptographic verification, Sigstore integration, and semantic analysis features.
+Cryptographic verification, Sigstore integration, and semantic analysis are planned for the hosted API (Pro), which is coming soon.
 
 ## Benchmark Methodology
 

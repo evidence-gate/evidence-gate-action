@@ -5,7 +5,7 @@ runs evaluation, and exits non-zero on failure (fail-closed).
 
 Supports three modes:
 - Free: no API key -> local evaluation via local_evaluator
-- Pro: API key set -> SaaS API evaluation
+- Pro: API key set -> SaaS API evaluation (hosted API coming soon)
 - Enterprise: API key + custom API base -> self-hosted evaluation
 """
 
@@ -499,11 +499,11 @@ def _write_upsell_summary(gate_type: str, upsell_message: str) -> None:
     """Append upsell message to GITHUB_STEP_SUMMARY."""
     lines = [
         "",
-        "### Upgrade Available",
+        "### Pro (hosted API) coming soon",
         "",
         f"> {upsell_message}",
         "",
-        f"[View Plans]({PRICING_URL})",
+        f"[Plan status]({PRICING_URL})",
     ]
     _append_summary("\n".join(lines))
 

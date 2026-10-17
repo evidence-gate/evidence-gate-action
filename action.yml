@@ -10,8 +10,9 @@ inputs:
   api_key:
     description: >-
       Evidence Gate API key. Optional — omit for Free mode (client-side
-      evaluation only). Required for Pro/Enterprise features (Blind Gate,
-      Quality State, Remediation).
+      evaluation, available now). Pro/Enterprise features (Blind Gate,
+      Quality State, Remediation) need the hosted API (Pro), which is
+      coming soon; API keys are not issued yet.
     required: false
     default: ""
   gate_type:
@@ -31,7 +32,7 @@ inputs:
     required: false
     default: ""
   api_base:
-    description: "Evidence Gate API base URL (change for Self-hosted Enterprise)"
+    description: "Evidence Gate API base URL, used only when api_key is set. The hosted API (Pro) at the default URL is coming soon and not yet available; change for Self-hosted Enterprise"
     required: false
     default: "https://api.evidence-gate.dev"
   dashboard_base_url:
