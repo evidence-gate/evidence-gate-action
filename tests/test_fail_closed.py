@@ -52,6 +52,28 @@ def test_valid_evidence_passes(tmp_path) -> None:
 
 
 def test_known_gate_types_include_documented_ones() -> None:
-    for g in ("test_coverage", "security", "build", "skill", "sbom", "provenance",
-              "nemoclaw_blueprint", "nemoclaw_policy", "custom"):
+    for g in (
+        "test_coverage",
+        "security",
+        "build",
+        "skill",
+        "sbom",
+        "provenance",
+        "nemoclaw_blueprint",
+        "nemoclaw_policy",
+        "custom",
+    ):
         assert g in KNOWN_GATE_TYPES
+
+
+def test_integration_workflow_gate_types_are_known() -> None:
+    """CI must not expect a pass from an undocumented gate such as file_check."""
+    import re
+    from pathlib import Path
+
+    workflow = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "integration.yml"
+    gate_types = re.findall(r'gate_type:\s*"([^"]+)"', workflow.read_text(encoding="utf-8"))
+    assert gate_types
+    assert "file_check" not in gate_types
+    for gate_type in gate_types:
+        assert gate_type in KNOWN_GATE_TYPES

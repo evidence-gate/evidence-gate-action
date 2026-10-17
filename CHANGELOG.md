@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** unknown `gate_type` values now fail in Free mode (they previously passed). Release this as a new minor or major tag. Do not move the existing `v1` tag.
+
 ### Fixed
 
 - **Fail-closed in Free mode**: a gate with no evidence files, an empty evidence file (`{}`, `[]`, `null`), or an unknown `gate_type` now FAILS instead of silently passing.
