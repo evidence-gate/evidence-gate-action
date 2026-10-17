@@ -341,6 +341,7 @@ class TestParseYamlOrJson:
         path.write_text("key: value")
         # Simulate PyYAML not installed by patching builtins import
         import builtins
+
         original_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
@@ -397,11 +398,13 @@ class TestEvaluateNemoclaw:
             "version": 1,
             "network_policies": {
                 "test": {
-                    "endpoints": [{
-                        "host": "evil.com",
-                        "port": 443,
-                        "enforcement": "monitor",
-                    }],
+                    "endpoints": [
+                        {
+                            "host": "evil.com",
+                            "port": 443,
+                            "enforcement": "monitor",
+                        }
+                    ],
                 },
             },
         }
@@ -447,9 +450,7 @@ class TestNemoClawRecommendations:
 
         result = {
             "passed": False,
-            "issues": [
-                "POLICY_WEAK_ENFORCEMENT: test.endpoints[0] has enforcement='monitor'"
-            ],
+            "issues": ["POLICY_WEAK_ENFORCEMENT: test.endpoints[0] has enforcement='monitor'"],
         }
         actions = _generate_suggested_actions("nemoclaw_policy", result)
         assert len(actions) > 0

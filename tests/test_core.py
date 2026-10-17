@@ -59,9 +59,7 @@ class TestRequestFormat:
     """Verify requests match the Evidence Gate API contract."""
 
     @patch("core.urlopen")
-    def test_evaluate_sends_correct_method_and_path(
-        self, mock_urlopen: MagicMock
-    ) -> None:
+    def test_evaluate_sends_correct_method_and_path(self, mock_urlopen: MagicMock) -> None:
         """POST /v1/evaluate with correct method and URL."""
         mock_urlopen.return_value = make_mock_response({"passed": True})
 
@@ -83,9 +81,7 @@ class TestRequestFormat:
         assert req.get_header("Authorization") == "Bearer eg_test_contract_key"
 
     @patch("core.urlopen")
-    def test_evaluate_sends_json_content_type(
-        self, mock_urlopen: MagicMock
-    ) -> None:
+    def test_evaluate_sends_json_content_type(self, mock_urlopen: MagicMock) -> None:
         """Request includes application/json content type."""
         mock_urlopen.return_value = make_mock_response({"passed": True})
 
@@ -95,9 +91,7 @@ class TestRequestFormat:
         assert req.get_header("Content-type") == "application/json"
 
     @patch("core.urlopen")
-    def test_evaluate_body_has_required_fields(
-        self, mock_urlopen: MagicMock
-    ) -> None:
+    def test_evaluate_body_has_required_fields(self, mock_urlopen: MagicMock) -> None:
         """Request body contains gate_type and phase_id."""
         mock_urlopen.return_value = make_mock_response({"passed": True})
 
@@ -110,9 +104,7 @@ class TestRequestFormat:
         assert body["run_id"] == "test-run"
 
     @patch("core.urlopen")
-    def test_evaluate_body_omits_optional_none_fields(
-        self, mock_urlopen: MagicMock
-    ) -> None:
+    def test_evaluate_body_omits_optional_none_fields(self, mock_urlopen: MagicMock) -> None:
         """Optional fields are omitted when None."""
         mock_urlopen.return_value = make_mock_response({"passed": True})
 
@@ -126,9 +118,7 @@ class TestRequestFormat:
         assert "evidence" not in body
 
     @patch("core.urlopen")
-    def test_evaluate_body_includes_link_fields(
-        self, mock_urlopen: MagicMock
-    ) -> None:
+    def test_evaluate_body_includes_link_fields(self, mock_urlopen: MagicMock) -> None:
         """GitHub/Langfuse link fields should be forwarded when provided."""
         mock_urlopen.return_value = make_mock_response({"passed": True})
 
@@ -145,9 +135,7 @@ class TestRequestFormat:
         assert body["evidence_url"] == "https://dashboard.example.com?run_id=test-run"
 
     @patch("core.urlopen")
-    def test_batch_evaluate_sends_correct_path(
-        self, mock_urlopen: MagicMock
-    ) -> None:
+    def test_batch_evaluate_sends_correct_path(self, mock_urlopen: MagicMock) -> None:
         """POST /v1/evaluate/batch with correct URL."""
         mock_urlopen.return_value = make_mock_response({"results": []})
 
@@ -164,9 +152,7 @@ class TestRequestFormat:
         assert body["fail_fast"] is False
 
     @patch("core.urlopen")
-    def test_batch_evaluate_includes_optional_links(
-        self, mock_urlopen: MagicMock
-    ) -> None:
+    def test_batch_evaluate_includes_optional_links(self, mock_urlopen: MagicMock) -> None:
         """Batch request should include optional GitHub/evidence links."""
         mock_urlopen.return_value = make_mock_response({"results": []})
 
@@ -198,9 +184,7 @@ class TestFailClosed:
         result = _get_config()
         assert result == ("", "")
 
-    def test_post_raises_when_no_api_key(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_post_raises_when_no_api_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """_post (via evaluate) raises EvidenceGateError when no api_key."""
         monkeypatch.delenv("EG_API_KEY")
         with pytest.raises(EvidenceGateError, match="EG_API_KEY"):
@@ -243,9 +227,7 @@ class TestFailClosed:
             fail_closed_main(raise_error)
         assert exc_info.value.code == 1
 
-    def test_fail_closed_main_passes_on_success(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_fail_closed_main_passes_on_success(self, capsys: pytest.CaptureFixture[str]) -> None:
         """fail_closed_main does not exit on passed result."""
         fail_closed_main(lambda: {"passed": True})
         captured = capsys.readouterr()
@@ -260,9 +242,7 @@ class TestFailClosed:
 class TestEvidenceHashing:
     """Verify SHA-256 hash computation accuracy and EvidenceRef schema compliance."""
 
-    def test_build_evidence_ref_computes_correct_sha256(
-        self, evidence_file: str
-    ) -> None:
+    def test_build_evidence_ref_computes_correct_sha256(self, evidence_file: str) -> None:
         """SHA-256 hash matches manual computation."""
         ref = build_evidence_ref(evidence_file)
 
@@ -278,16 +258,12 @@ class TestEvidenceHashing:
         actual_size = os.path.getsize(evidence_file)
         assert ref["size_bytes"] == actual_size
 
-    def test_build_evidence_ref_includes_abs_path(
-        self, evidence_file: str
-    ) -> None:
+    def test_build_evidence_ref_includes_abs_path(self, evidence_file: str) -> None:
         """Evidence ref 'path' field includes absolute file path."""
         ref = build_evidence_ref(evidence_file)
         assert os.path.isabs(ref["path"])
 
-    def test_build_evidence_ref_schema_matches_evidence_ref_model(
-        self, evidence_file: str
-    ) -> None:
+    def test_build_evidence_ref_schema_matches_evidence_ref_model(self, evidence_file: str) -> None:
         """Evidence ref dict is compatible with EvidenceRef Pydantic model."""
         ref = build_evidence_ref(evidence_file)
 
@@ -306,9 +282,7 @@ class TestEvidenceHashing:
         with pytest.raises(EvidenceGateError, match="not found"):
             build_evidence_ref("/nonexistent/file.json")
 
-    def test_collect_evidence_refs_skips_missing(
-        self, evidence_file: str
-    ) -> None:
+    def test_collect_evidence_refs_skips_missing(self, evidence_file: str) -> None:
         """collect_evidence_refs skips non-existent files."""
         refs = collect_evidence_refs([evidence_file, "/nonexistent/file.json"])
         assert len(refs) == 1

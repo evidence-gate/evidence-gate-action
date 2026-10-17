@@ -76,16 +76,20 @@ def evidence_dir(tmp_path: Any) -> Any:
 
     # Nested object
     nested = tmp_path / "nested.json"
-    nested.write_text(json.dumps({
-        "metadata": {
-            "version": "1.0",
-            "timestamp": "2026-01-01T00:00:00Z",
-        },
-        "results": [
-            {"name": "test1", "passed": True},
-            {"name": "test2", "passed": False},
-        ],
-        "score": 75,
-    }))
+    nested.write_text(
+        json.dumps(
+            {
+                "metadata": {
+                    "version": "1.0",
+                    "timestamp": "2026-01-01T00:00:00Z",
+                },
+                "results": [
+                    {"name": "test1", "passed": True},
+                    {"name": "test2", "passed": False},
+                ],
+                "score": 75,
+            }
+        )
+    )
 
     return tmp_path

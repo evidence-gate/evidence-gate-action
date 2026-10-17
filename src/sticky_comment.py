@@ -59,8 +59,7 @@ def find_existing_comment(
     page = 1
     while True:
         url = (
-            f"{_API_BASE}/repos/{owner}/{repo}/issues/{pr_number}"
-            f"/comments?per_page=100&page={page}"
+            f"{_API_BASE}/repos/{owner}/{repo}/issues/{pr_number}/comments?per_page=100&page={page}"
         )
         comments = _github_api("GET", url, token)
         if not isinstance(comments, list) or not comments:
@@ -140,15 +139,9 @@ def post_sticky_comment(
                 "Sticky comment requires pull-requests: write permission"
             )
         else:
-            print(
-                f"::warning title=Evidence Gate::"
-                f"Failed to post sticky comment: HTTP {exc.code}"
-            )
+            print(f"::warning title=Evidence Gate::Failed to post sticky comment: HTTP {exc.code}")
     except (URLError, OSError) as exc:
-        print(
-            f"::warning title=Evidence Gate::"
-            f"Failed to post sticky comment: {exc}"
-        )
+        print(f"::warning title=Evidence Gate::Failed to post sticky comment: {exc}")
 
 
 def _get_pr_context() -> tuple[str, str, int] | None:

@@ -217,9 +217,7 @@ class TestConfigPath:
         )
         assert resolved.config_path == "/custom/path.yml"
 
-    def test_github_workspace_prepended_to_default(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_github_workspace_prepended_to_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """GITHUB_WORKSPACE is prepended to the default config path."""
         monkeypatch.setenv("GITHUB_WORKSPACE", "/repo")
         monkeypatch.delenv("EG_CONFIG_PATH", raising=False)
@@ -236,9 +234,7 @@ class TestConfigPath:
         )
         assert resolved.config_path == "/repo/.evidencegate.yml"
 
-    def test_fallback_to_cwd_when_no_workspace(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_fallback_to_cwd_when_no_workspace(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Config path falls back gracefully when GITHUB_WORKSPACE is unset."""
         monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
         monkeypatch.delenv("EG_CONFIG_PATH", raising=False)

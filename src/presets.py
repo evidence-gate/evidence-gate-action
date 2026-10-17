@@ -68,7 +68,5 @@ def expand_preset(name: str) -> list[str]:
     """
     if name not in PRESETS:
         valid = ", ".join(sorted(PRESETS.keys()))
-        raise ValueError(
-            f"Unknown preset '{name}'. Valid presets: {valid}"
-        )
+        raise ValueError(f"Unknown preset '{name}'. Valid presets: {valid}")
     return list(PRESETS[name])

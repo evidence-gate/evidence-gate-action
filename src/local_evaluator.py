@@ -25,51 +25,57 @@ from typing import Any
 # Pro feature boundary
 # ---------------------------------------------------------------------------
 
-PRO_ONLY_GATE_TYPES = frozenset({
-    "blind_gate",
-    "quality_state",
-    "remediation",
-    "composite",
-    "wave",
-})
+PRO_ONLY_GATE_TYPES = frozenset(
+    {
+        "blind_gate",
+        "quality_state",
+        "remediation",
+        "composite",
+        "wave",
+    }
+)
 
-NEMOCLAW_GATE_TYPES = frozenset({
-    "nemoclaw_blueprint",
-    "nemoclaw_policy",
-})
+NEMOCLAW_GATE_TYPES = frozenset(
+    {
+        "nemoclaw_blueprint",
+        "nemoclaw_policy",
+    }
+)
 
 PRICING_URL = "https://evidence-gate.dev#pricing"
 
 # Gate types recognised by the Free-mode evaluator. Anything else is
 # rejected (fail-closed) instead of silently passing.
-FREE_GENERIC_GATE_TYPES = frozenset({
-    "accessibility",
-    "app_store_metadata",
-    "asc_live",
-    "build",
-    "change_impact",
-    "compliance",
-    "content_assertion",
-    "custom",
-    "dependency",
-    "design_system",
-    "documentation",
-    "legal",
-    "localization",
-    "monetization",
-    "performance",
-    "privacy",
-    "procedure_trace",
-    "release_readiness",
-    "review_guideline",
-    "route_compliance",
-    "screenshot",
-    "security",
-    "skill",
-    "test_coverage",
-    "tool_invocation",
-    "xac",
-})
+FREE_GENERIC_GATE_TYPES = frozenset(
+    {
+        "accessibility",
+        "app_store_metadata",
+        "asc_live",
+        "build",
+        "change_impact",
+        "compliance",
+        "content_assertion",
+        "custom",
+        "dependency",
+        "design_system",
+        "documentation",
+        "legal",
+        "localization",
+        "monetization",
+        "performance",
+        "privacy",
+        "procedure_trace",
+        "release_readiness",
+        "review_guideline",
+        "route_compliance",
+        "screenshot",
+        "security",
+        "skill",
+        "test_coverage",
+        "tool_invocation",
+        "xac",
+    }
+)
 
 KNOWN_GATE_TYPES = (
     FREE_GENERIC_GATE_TYPES
@@ -293,9 +299,7 @@ def _parse_yaml_or_json(path: str) -> dict[str, Any]:
         try:
             import yaml  # type: ignore[import-untyped]
         except ImportError as err:
-            raise ValueError(
-                "YAML evidence files require PyYAML: pip install pyyaml"
-            ) from err
+            raise ValueError("YAML evidence files require PyYAML: pip install pyyaml") from err
         data = yaml.safe_load(content)
         if not isinstance(data, dict):
             raise ValueError(f"YAML root must be a mapping, got {type(data).__name__}")
@@ -371,9 +375,7 @@ def _check_blueprint(data: dict[str, Any]) -> list[str]:
     for field in ("min_openshell_version", "min_openclaw_version"):
         val = data.get(field)
         if val is not None and (not isinstance(val, str) or not _SEMVER_PATTERN.match(val)):
-            issues.append(
-                f"BLUEPRINT_INVALID_{field.upper()}: '{val}' is not valid semver"
-            )
+            issues.append(f"BLUEPRINT_INVALID_{field.upper()}: '{val}' is not valid semver")
 
     return issues
 
@@ -434,8 +436,7 @@ def _check_policy(data: dict[str, Any]) -> list[str]:
                 tls = ep.get("tls")
                 if port == 443 and tls != "terminate":
                     issues.append(
-                        f"POLICY_MISSING_TLS: {ep_id} on port 443 "
-                        f"should have tls='terminate'"
+                        f"POLICY_MISSING_TLS: {ep_id} on port 443 should have tls='terminate'"
                     )
 
                 # Wildcard method check
@@ -463,8 +464,7 @@ def _check_policy(data: dict[str, Any]) -> list[str]:
                     for dangerous in dangerous_paths:
                         if rw_path == dangerous or rw_path.startswith(dangerous + "/"):
                             issues.append(
-                                f"POLICY_DANGEROUS_WRITABLE: filesystem allows "
-                                f"write to '{rw_path}'"
+                                f"POLICY_DANGEROUS_WRITABLE: filesystem allows write to '{rw_path}'"
                             )
 
     return issues
@@ -577,29 +577,21 @@ def evaluate_sbom(
         # Detect format
         fmt = _detect_sbom_format(data)
         if fmt is None:
-            issues.append(
-                "Unrecognized SBOM format: neither CycloneDX nor SPDX fields found"
-            )
+            issues.append("Unrecognized SBOM format: neither CycloneDX nor SPDX fields found")
             continue
 
         # Validate components/packages
         if fmt == "cyclonedx":
             components = data.get("components")
             if not components:
-                issues.append(
-                    "Warning: CycloneDX SBOM has empty or missing components array"
-                )
+                issues.append("Warning: CycloneDX SBOM has empty or missing components array")
         elif fmt == "spdx":
             packages = data.get("packages")
             if not packages:
-                issues.append(
-                    "Warning: SPDX SBOM has empty or missing packages array"
-                )
+                issues.append("Warning: SPDX SBOM has empty or missing packages array")
 
     # Warnings (component/package emptiness) do not cause failure
-    failed = any(
-        not issue.startswith("Warning:") for issue in issues
-    )
+    failed = any(not issue.startswith("Warning:") for issue in issues)
     return {
         "passed": not failed,
         "mode": "free",
@@ -627,9 +619,7 @@ def _validate_intoto_statement(
 
     # _type field
     stmt_type = stmt.get("_type", "")
-    if not isinstance(stmt_type, str) or not stmt_type.startswith(
-        "https://in-toto.io/Statement/"
-    ):
+    if not isinstance(stmt_type, str) or not stmt_type.startswith("https://in-toto.io/Statement/"):
         issues.append(
             f"{prefix}Missing or invalid '_type' field "
             "(expected 'https://in-toto.io/Statement/...')"
@@ -661,16 +651,12 @@ def _validate_intoto_statement(
         # SLSA v1.0 specific checks
         build_def = predicate.get("buildDefinition")
         if isinstance(build_def, dict) and "buildType" not in build_def:
-            issues.append(
-                f"{prefix}predicate.buildDefinition missing 'buildType'"
-            )
+            issues.append(f"{prefix}predicate.buildDefinition missing 'buildType'")
         run_details = predicate.get("runDetails")
         if isinstance(run_details, dict):
             builder = run_details.get("builder")
             if isinstance(builder, dict) and "id" not in builder:
-                issues.append(
-                    f"{prefix}predicate.runDetails.builder missing 'id'"
-                )
+                issues.append(f"{prefix}predicate.runDetails.builder missing 'id'")
 
 
 def evaluate_provenance(
@@ -708,9 +694,7 @@ def evaluate_provenance(
 
         data = json_result["data"]
         if not isinstance(data, dict):
-            issues.append(
-                f"Provenance root must be an object, got {type(data).__name__}"
-            )
+            issues.append(f"Provenance root must be an object, got {type(data).__name__}")
             continue
 
         # Detect format: dsseEnvelope first, then raw in-toto
@@ -723,9 +707,7 @@ def evaluate_provenance(
                 raw_payload = base64.b64decode(envelope["payload"])
                 stmt = json.loads(raw_payload)
             except (ValueError, json.JSONDecodeError):
-                issues.append(
-                    "Failed to decode attestation bundle payload"
-                )
+                issues.append("Failed to decode attestation bundle payload")
                 continue
             if not isinstance(stmt, dict):
                 issues.append("Decoded payload is not a JSON object")
@@ -735,8 +717,7 @@ def evaluate_provenance(
             _validate_intoto_statement(data, issues)
         else:
             issues.append(
-                "Unrecognized provenance format: "
-                "neither dsseEnvelope nor _type field found"
+                "Unrecognized provenance format: neither dsseEnvelope nor _type field found"
             )
 
     passed = len(issues) == 0
@@ -813,14 +794,15 @@ def evaluate_local(
             "gate_type": gate_type,
             "phase_id": phase_id,
             "issues": [
-                f"UNKNOWN_GATE_TYPE: '{gate_type}' is not a supported gate type "
-                "(fail-closed)."
+                f"UNKNOWN_GATE_TYPE: '{gate_type}' is not a supported gate type (fail-closed)."
             ],
         }
 
-    threshold_value = (checks.get("threshold") or {}).get("value") if isinstance(
-        checks.get("threshold"), dict
-    ) else None
+    threshold_value = (
+        (checks.get("threshold") or {}).get("value")
+        if isinstance(checks.get("threshold"), dict)
+        else None
+    )
     if (
         not evidence_files
         and not checks.get("required_files")

@@ -146,9 +146,7 @@ class TestFreeMode:
 class TestEnterpriseMode:
     """Enterprise mode detection (new)."""
 
-    def test_main_detects_enterprise_mode(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_main_detects_enterprise_mode(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """api_key + custom api_base = enterprise mode."""
         monkeypatch.setenv("EG_API_KEY", "eg_enterprise_key")
         monkeypatch.setenv("EG_API_BASE", "https://eg.corp.example.com")
@@ -173,9 +171,7 @@ class TestEnterpriseMode:
 class TestModeOutput:
     """Mode output value tests (new)."""
 
-    def test_mode_output_is_set_free(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_mode_output_is_set_free(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """Mode output is 'free' when no api_key."""
         monkeypatch.delenv("EG_API_KEY")
         monkeypatch.delenv("EG_API_BASE", raising=False)
@@ -190,9 +186,7 @@ class TestModeOutput:
         entrypoint.main()
         assert "mode=free" in output.read_text()
 
-    def test_mode_output_is_set_pro(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_mode_output_is_set_pro(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """Mode output is 'pro' when api_key set without custom base."""
         monkeypatch.setenv("EG_API_KEY", "eg_pro_key")
         monkeypatch.delenv("EG_API_BASE", raising=False)
@@ -443,9 +437,7 @@ class TestOIDCMasking:
         mask_lines = [ln for ln in lines if "::add-mask::" in ln]
         assert len(mask_lines) >= 1
 
-    def test_auth_success_notice(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys
-    ) -> None:
+    def test_auth_success_notice(self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys) -> None:
         """Successful auth emits ::notice title=Evidence Gate:: annotation."""
         monkeypatch.setenv("EG_API_KEY", "eg_pro_key_notice")
         monkeypatch.delenv("EG_API_BASE", raising=False)
@@ -657,9 +649,7 @@ class TestObserveMode:
         captured = capsys.readouterr()
         assert "RuntimeError" in captured.out or "RuntimeError" in captured.err
 
-    def test_enforce_mode_unchanged(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_enforce_mode_unchanged(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """Default (enforce) mode still exits on failure -- no regression."""
         output = tmp_path / "output.txt"
         summary = tmp_path / "summary.md"
@@ -702,9 +692,7 @@ class TestJsonOutput:
         delimiter_lines = [ln for ln in lines if ln.startswith("ghadelimiter_")]
         assert len(delimiter_lines) == 1  # closing delimiter on its own line
 
-    def test_json_output_set_on_pass(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_json_output_set_on_pass(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """json_output is set in GITHUB_OUTPUT on passing result."""
         output = tmp_path / "output.txt"
         summary = tmp_path / "summary.md"
@@ -725,9 +713,7 @@ class TestJsonOutput:
         output_text = output.read_text()
         assert "json_output<<ghadelimiter_" in output_text
 
-    def test_json_output_set_on_fail(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_json_output_set_on_fail(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """json_output is set in GITHUB_OUTPUT even on failing result."""
         output = tmp_path / "output.txt"
         summary = tmp_path / "summary.md"
@@ -748,9 +734,7 @@ class TestJsonOutput:
         output_text = output.read_text()
         assert "json_output<<ghadelimiter_" in output_text
 
-    def test_json_output_in_free_mode(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_json_output_in_free_mode(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """json_output is set in Free mode."""
         monkeypatch.delenv("EG_API_KEY")
         monkeypatch.delenv("EG_API_BASE", raising=False)
@@ -768,9 +752,7 @@ class TestJsonOutput:
         output_text = output.read_text()
         assert "json_output<<ghadelimiter_" in output_text
 
-    def test_json_output_in_observe_mode(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_json_output_in_observe_mode(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """json_output is set in observe mode."""
         output = tmp_path / "output.txt"
         summary = tmp_path / "summary.md"
@@ -791,9 +773,7 @@ class TestJsonOutput:
         output_text = output.read_text()
         assert "json_output<<ghadelimiter_" in output_text
 
-    def test_json_output_is_valid_json(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path
-    ) -> None:
+    def test_json_output_is_valid_json(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         """json_output content is valid parseable JSON."""
         import json
         import re
@@ -837,9 +817,21 @@ class TestMissingEvidence:
             "passed": False,
             "issues": [],
             "structured_issues": [
-                {"code": "MISSING_EVIDENCE_FILE", "message": "No test report found", "field_path": "evidence.test_report"},
-                {"code": "SECURITY_SCAN_OK", "message": "Security scan passed", "field_path": "evidence.security"},
-                {"code": "MISSING_COVERAGE_DATA", "message": "Coverage data absent", "field_path": "evidence.coverage"},
+                {
+                    "code": "MISSING_EVIDENCE_FILE",
+                    "message": "No test report found",
+                    "field_path": "evidence.test_report",
+                },
+                {
+                    "code": "SECURITY_SCAN_OK",
+                    "message": "Security scan passed",
+                    "field_path": "evidence.security",
+                },
+                {
+                    "code": "MISSING_COVERAGE_DATA",
+                    "message": "Coverage data absent",
+                    "field_path": "evidence.coverage",
+                },
             ],
         }
         missing = entrypoint._extract_missing_evidence(result)
@@ -1225,14 +1217,16 @@ class TestStickyComment:
         _original_post = entrypoint.post_sticky_comment
 
         def _mock_post(owner, repo, pr_number, token, results, observe):
-            sticky_calls.append({
-                "owner": owner,
-                "repo": repo,
-                "pr_number": pr_number,
-                "token": token,
-                "results": results,
-                "observe": observe,
-            })
+            sticky_calls.append(
+                {
+                    "owner": owner,
+                    "repo": repo,
+                    "pr_number": pr_number,
+                    "token": token,
+                    "results": results,
+                    "observe": observe,
+                }
+            )
 
         monkeypatch.setattr(entrypoint, "post_sticky_comment", _mock_post)
 
@@ -1291,7 +1285,8 @@ class TestConfigFileIntegration:
         monkeypatch.delenv("EG_API_KEY", raising=False)
 
         monkeypatch.setattr(
-            entrypoint, "evaluate_local",
+            entrypoint,
+            "evaluate_local",
             lambda **kwargs: {"passed": True, "issues": []},
         )
 
@@ -1322,8 +1317,7 @@ class TestConfigFileIntegration:
 
         entrypoint.main()
         assert seen_gate_types == ["explicit_type"], (
-            f"Expected gate_type='explicit_type' (explicit input wins), "
-            f"got {seen_gate_types}"
+            f"Expected gate_type='explicit_type' (explicit input wins), got {seen_gate_types}"
         )
 
     def test_main_exits_with_error_when_no_gate_type_in_config_or_input(
@@ -1476,9 +1470,7 @@ class TestAnnotationLevels:
         RED: This test MUST FAIL until Plan 02 adds warn_mode param to _emit_annotations.
         Calling with warn_mode=True raises TypeError (unexpected keyword argument).
         """
-        entrypoint._emit_annotations(
-            ["coverage below threshold"], passed=False, warn_mode=True
-        )
+        entrypoint._emit_annotations(["coverage below threshold"], passed=False, warn_mode=True)
         captured = capsys.readouterr()
         assert "::warning" in captured.out
 
@@ -1551,9 +1543,7 @@ class TestRetryPrompt:
 
     def test_retry_prompt_empty_on_pass(self) -> None:
         """Passing result produces empty retry_prompt."""
-        result = entrypoint._build_retry_prompt(
-            "sbom", "1a", {"passed": True, "issues": []}
-        )
+        result = entrypoint._build_retry_prompt("sbom", "1a", {"passed": True, "issues": []})
         assert result == ""
 
     def test_retry_prompt_structure_on_failure(self) -> None:
