@@ -562,8 +562,7 @@ The hosted API (Pro) is coming soon. The Pro / Enterprise column describes plann
 |---------|:----:|:----------------:|
 | Evaluation limit | None (local mode) | To be announced |
 | Gate types | 30 of 35 | All 35 |
-| SARIF output | Yes | Yes |
-| GitHub Check Runs | Yes | Yes |
+| Check Run annotations | Yes | Yes |
 | SHA-256 integrity hashing | Yes | Yes |
 | Fail-closed error handling | Yes | Yes |
 | `GITHUB_STEP_SUMMARY` | Yes | Yes |

@@ -13,6 +13,7 @@ Docs-only release; no change to evaluation behaviour.
 ### Changed
 
 - README (EN/JA), `action.yml` description (Marketplace) and `docs/architecture.svg` now match the source: 35 gate types in total (26 generic, 5 Pro-only, 2 NemoClaw, `sbom`, `provenance`), 30 usable in Free mode, no evaluation limit in local mode. Removed the incorrect "25 gate types" and "100 evaluations/month" (Free) / "5,000+" (Pro) figures. Pro (hosted API) and Enterprise remain coming soon.
+- Removed "SARIF output" from the Free vs Pro table (not implemented); "GitHub Check Runs" is now "Check Run annotations".
 - README usage examples reference `@v2`.
 - `RELEASING.md` describes the current `master` / `v2` release flow.
 
