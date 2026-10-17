@@ -10,11 +10,11 @@ jobs:
       - name: Create test evidence file
         run: echo '{"test": true, "score": 95}' > evidence.json
 
-      - name: Run Evidence Gate (Free mode - file_check)
+      - name: Run Evidence Gate (Free mode - test_coverage)
         uses: ./
         id: gate
         with:
-          gate_type: "file_check"
+          gate_type: "test_coverage"
           phase_id: "test"
           evidence_files: "evidence.json"
 
@@ -33,7 +33,7 @@ jobs:
             exit 1
           fi
 
-          echo "Free mode file_check integration test: PASS"
+          echo "Free mode test_coverage integration test: PASS"
 
   test-pro-feature-upsell:
     runs-on: ubuntu-latest
@@ -74,7 +74,7 @@ jobs:
         uses: ./
         id: gate
         with:
-          gate_type: "file_check"
+          gate_type: "test_coverage"
           phase_id: "test"
           evidence_files: "nonexistent_evidence_file_that_does_not_exist.json"
           mode: "warn"

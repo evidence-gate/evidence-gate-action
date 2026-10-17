@@ -11,9 +11,6 @@ Key functions:
 
 from __future__ import annotations
 
-CORE_VERSION = "1.1.0"
-CORE_SHA256 = ""  # placeholder -- computed below
-
 import hashlib
 import json
 import os
@@ -23,6 +20,9 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+CORE_VERSION = "1.1.0"
+CORE_SHA256 = ""  # placeholder -- computed below
 
 
 class EvidenceGateError(Exception):

@@ -40,6 +40,49 @@ NEMOCLAW_GATE_TYPES = frozenset({
 
 PRICING_URL = "https://evidence-gate.dev#pricing"
 
+# Gate types recognised by the Free-mode evaluator. Anything else is
+# rejected (fail-closed) instead of silently passing.
+FREE_GENERIC_GATE_TYPES = frozenset({
+    "accessibility",
+    "app_store_metadata",
+    "asc_live",
+    "build",
+    "change_impact",
+    "compliance",
+    "content_assertion",
+    "custom",
+    "dependency",
+    "design_system",
+    "documentation",
+    "legal",
+    "localization",
+    "monetization",
+    "performance",
+    "privacy",
+    "procedure_trace",
+    "release_readiness",
+    "review_guideline",
+    "route_compliance",
+    "screenshot",
+    "security",
+    "skill",
+    "test_coverage",
+    "tool_invocation",
+    "xac",
+})
+
+KNOWN_GATE_TYPES = (
+    FREE_GENERIC_GATE_TYPES
+    | PRO_ONLY_GATE_TYPES
+    | NEMOCLAW_GATE_TYPES
+    | frozenset({"sbom", "provenance"})
+)
+
+
+def _is_empty_evidence(data: Any) -> bool:
+    """Return True when parsed JSON evidence carries no content."""
+    return data is None or (isinstance(data, (dict, list, str)) and len(data) == 0)
+
 
 # ---------------------------------------------------------------------------
 # Individual check functions
@@ -761,6 +804,39 @@ def evaluate_local(
     evidence_files = evidence_files or []
     checks = checks or {}
 
+    # 0. Fail-closed preconditions: unknown gate types and missing evidence
+    #    must never pass silently.
+    if gate_type not in KNOWN_GATE_TYPES:
+        return {
+            "passed": False,
+            "mode": "free",
+            "gate_type": gate_type,
+            "phase_id": phase_id,
+            "issues": [
+                f"UNKNOWN_GATE_TYPE: '{gate_type}' is not a supported gate type "
+                "(fail-closed)."
+            ],
+        }
+
+    threshold_value = (checks.get("threshold") or {}).get("value") if isinstance(
+        checks.get("threshold"), dict
+    ) else None
+    if (
+        not evidence_files
+        and not checks.get("required_files")
+        and not isinstance(threshold_value, (int, float))
+    ):
+        return {
+            "passed": False,
+            "mode": "free",
+            "gate_type": gate_type,
+            "phase_id": phase_id,
+            "issues": [
+                "EVIDENCE_MISSING: no evidence_files were provided "
+                "(fail-closed: a gate without evidence cannot pass)."
+            ],
+        }
+
     # 1. Check required files
     required_files = checks.get("required_files", [])
     for req_path in required_files:
@@ -777,6 +853,12 @@ def evaluate_local(
         json_result = check_json_valid(efile)
         if not json_result["passed"]:
             issues.append(json_result["message"])
+            continue
+        if _is_empty_evidence(json_result.get("data")):
+            issues.append(
+                f"EVIDENCE_EMPTY: {os.path.abspath(efile)} contains no evidence "
+                "(empty JSON object/array/null)."
+            )
             continue
 
         # 3. Schema validation if provided

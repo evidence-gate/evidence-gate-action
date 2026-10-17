@@ -39,7 +39,7 @@ Test that a new user can install the action:
 ```yaml
 - uses: evidence-gate/evidence-gate-action@v1
   with:
-    gate_type: "file_check"
+    gate_type: "test_coverage"
     phase_id: "test"
     evidence_files: "test.json"
 ```

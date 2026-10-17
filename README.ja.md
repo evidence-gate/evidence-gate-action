@@ -82,7 +82,7 @@ jobs:
 | `gate_preset` | いいえ | `""` | 名前付きゲートバンドル（`web-app-baseline`、`enterprise-compliance`、`api-service`、`supply-chain`）。プリセット内のすべてのゲートを実行 |
 | `sticky_comment` | いいえ | `false` | 結果を単一の自動更新 PR コメントに集約。`pull-requests: write` が必要 |
 | `debug` | いいえ | `false` | 詳細な診断出力を有効化 |
-| `version` | いいえ | `latest` | インストールする評価エンジンのバージョン（例: `1.0.0`）。`latest` は標準ライブラリのみの評価を使用 |
+| `version` | いいえ | `latest` | 非推奨（何もしません）。後方互換のために残しています。本アクションは常に同梱の標準ライブラリのみの評価エンジンを使用します |
 | `dashboard_base_url` | いいえ | `""` | ダッシュボードのディープリンク用ベース URL |
 | `evidence_url` | いいえ | `""` | 明示的なエビデンスディープリンク URL |
 

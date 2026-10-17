@@ -6,12 +6,9 @@ These tests are RED until config_loader.py is implemented (Plan 02).
 
 from __future__ import annotations
 
-import sys
-
 import pytest
 
 # This import will fail (RED) until Plan 02 creates config_loader.py
-import config_loader
 from config_loader import ConfigError, load_config, resolve_config, validate_config
 
 

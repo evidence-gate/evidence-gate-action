@@ -14,8 +14,6 @@ Verifies:
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
 
 import entrypoint
@@ -128,7 +126,7 @@ class TestFreeMode:
     def test_free_mode_with_no_evidence_files(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path
     ) -> None:
-        """Free mode works with no evidence files."""
+        """Free mode fails closed when no evidence files are provided."""
         monkeypatch.delenv("EG_API_KEY")
         monkeypatch.delenv("EG_API_BASE", raising=False)
         monkeypatch.setenv("EG_GATE_TYPE", "skill")
@@ -141,7 +139,7 @@ class TestFreeMode:
         monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
 
         result = entrypoint.main()
-        assert result["passed"] is True
+        assert result["passed"] is False
         assert result["mode"] == "free"
 
 
@@ -167,7 +165,7 @@ class TestEnterpriseMode:
 
         monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
 
-        result = entrypoint.main()
+        entrypoint.main()
         output_text = output.read_text()
         assert "mode=enterprise" in output_text
 
@@ -189,7 +187,7 @@ class TestModeOutput:
         monkeypatch.setenv("GITHUB_OUTPUT", str(output))
         monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
 
-        result = entrypoint.main()
+        entrypoint.main()
         assert "mode=free" in output.read_text()
 
     def test_mode_output_is_set_pro(
@@ -211,7 +209,7 @@ class TestModeOutput:
 
         monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
 
-        result = entrypoint.main()
+        entrypoint.main()
         assert "mode=pro" in output.read_text()
 
 
@@ -442,7 +440,7 @@ class TestOIDCMasking:
         assert "::add-mask::eg_secret_key_12345" in captured.out
         # Masking should appear before any other workflow commands
         lines = captured.out.strip().split("\n")
-        mask_lines = [l for l in lines if "::add-mask::" in l]
+        mask_lines = [ln for ln in lines if "::add-mask::" in ln]
         assert len(mask_lines) >= 1
 
     def test_auth_success_notice(
@@ -701,7 +699,7 @@ class TestJsonOutput:
         assert "line1\nline2" in content
         # Verify delimiter appears twice (open + close)
         lines = content.strip().split("\n")
-        delimiter_lines = [l for l in lines if l.startswith("ghadelimiter_")]
+        delimiter_lines = [ln for ln in lines if ln.startswith("ghadelimiter_")]
         assert len(delimiter_lines) == 1  # closing delimiter on its own line
 
     def test_json_output_set_on_pass(
@@ -896,7 +894,6 @@ class TestMissingEvidence:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path
     ) -> None:
         """main() sets missing_evidence in GITHUB_OUTPUT on failure."""
-        import json
 
         output = tmp_path / "output.txt"
         summary = tmp_path / "summary.md"
@@ -1097,9 +1094,12 @@ class TestGatePresets:
         summary = tmp_path / "summary.md"
         monkeypatch.delenv("EG_API_KEY")
         monkeypatch.delenv("EG_API_BASE", raising=False)
+        evidence = tmp_path / "evidence.json"
+        evidence.write_text('{"result": "ok"}')
         monkeypatch.setenv("EG_GATE_PRESET", "web-app-baseline")
         monkeypatch.setenv("EG_GATE_TYPE", "")
         monkeypatch.setenv("EG_PHASE_ID", "1a")
+        monkeypatch.setenv("EG_EVIDENCE_FILES", str(evidence))
         monkeypatch.setenv("GITHUB_OUTPUT", str(output))
         monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
         monkeypatch.delenv("EG_MODE", raising=False)
@@ -1171,7 +1171,7 @@ class TestGatePresets:
 
         monkeypatch.setattr(entrypoint, "evaluate", _fake_evaluate)
 
-        result = entrypoint.main()
+        entrypoint.main()
 
         # Should be single evaluation (not 4 from preset)
         assert len(eval_calls) == 1
@@ -1222,7 +1222,7 @@ class TestStickyComment:
         monkeypatch.delenv("EG_MODE", raising=False)
 
         sticky_calls: list[dict] = []
-        original_post = entrypoint.post_sticky_comment
+        _original_post = entrypoint.post_sticky_comment
 
         def _mock_post(owner, repo, pr_number, token, results, observe):
             sticky_calls.append({
@@ -1574,7 +1574,6 @@ class TestRetryPrompt:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path
     ) -> None:
         """main() writes retry_prompt to GITHUB_OUTPUT on failure."""
-        import re
 
         output = tmp_path / "output.txt"
         summary = tmp_path / "summary.md"
