@@ -150,21 +150,21 @@ def _extract_missing_evidence(result: dict) -> list[dict]:
 # Tuple: (gate_pattern, issue_code_pattern, action_dict)
 # Uses fnmatch wildcards. First match wins per issue. Fallback at end.
 _RECOMMENDATION_TABLE: list[tuple[str, str, dict]] = [
-    ("security", "SECURITY_SCAN_*", {"action_id": "security-patch-vulnerabilities", "description": "Review and patch vulnerabilities in scan report", "priority": "high"}),
-    ("build", "BUILD_FAIL*", {"action_id": "build-fix-compilation", "description": "Fix compilation errors before re-evaluation", "priority": "high"}),
-    ("test_coverage", "COVERAGE_BELOW*", {"action_id": "coverage-add-tests", "description": "Add tests to improve code coverage", "priority": "medium"}),
-    ("privacy", "PRIVACY_*", {"action_id": "privacy-update-manifest", "description": "Update privacy manifest and data handling declarations", "priority": "medium"}),
-    ("nemoclaw_blueprint", "BLUEPRINT_MISSING_*", {"action_id": "nemoclaw-fix-blueprint", "description": "Add missing required fields to NemoClaw blueprint.yaml", "priority": "high"}),
-    ("nemoclaw_blueprint", "BLUEPRINT_INVALID_*", {"action_id": "nemoclaw-fix-blueprint-format", "description": "Fix invalid field format in NemoClaw blueprint.yaml", "priority": "high"}),
-    ("nemoclaw_blueprint", "BLUEPRINT_EMPTY_*", {"action_id": "nemoclaw-add-profile", "description": "Add at least one inference profile to NemoClaw blueprint", "priority": "high"}),
-    ("nemoclaw_blueprint", "BLUEPRINT_PROFILE_*", {"action_id": "nemoclaw-fix-profile", "description": "Add missing fields to NemoClaw inference profile", "priority": "medium"}),
-    ("nemoclaw_policy", "POLICY_MISSING_*", {"action_id": "nemoclaw-fix-policy-structure", "description": "Add missing required sections to OpenShell policy", "priority": "high"}),
-    ("nemoclaw_policy", "POLICY_WEAK_*", {"action_id": "nemoclaw-enforce-policy", "description": "Set enforcement mode to 'enforce' on all OpenShell endpoints", "priority": "high"}),
-    ("nemoclaw_policy", "POLICY_MISSING_TLS*", {"action_id": "nemoclaw-add-tls", "description": "Enable TLS termination on port 443 endpoints", "priority": "high"}),
-    ("nemoclaw_policy", "POLICY_WILDCARD_*", {"action_id": "nemoclaw-restrict-methods", "description": "Replace wildcard HTTP method rules with specific method constraints", "priority": "medium"}),
-    ("nemoclaw_policy", "POLICY_DANGEROUS_*", {"action_id": "nemoclaw-fix-filesystem", "description": "Remove dangerous writable paths from filesystem policy", "priority": "high"}),
-    ("*", "MISSING_EVIDENCE*", {"action_id": "missing-evidence-provide", "description": "Provide required evidence for this gate", "priority": "high"}),
-    ("*", "*", {"action_id": "generic-review-issue", "description": "Review and address the reported issue", "priority": "low"}),
+    ("security", "SECURITY_SCAN_*", {"action_id": "security-patch-vulnerabilities", "description": "Review and patch vulnerabilities in scan report", "priority": "high"}),  # noqa: E501
+    ("build", "BUILD_FAIL*", {"action_id": "build-fix-compilation", "description": "Fix compilation errors before re-evaluation", "priority": "high"}),  # noqa: E501
+    ("test_coverage", "COVERAGE_BELOW*", {"action_id": "coverage-add-tests", "description": "Add tests to improve code coverage", "priority": "medium"}),  # noqa: E501
+    ("privacy", "PRIVACY_*", {"action_id": "privacy-update-manifest", "description": "Update privacy manifest and data handling declarations", "priority": "medium"}),  # noqa: E501
+    ("nemoclaw_blueprint", "BLUEPRINT_MISSING_*", {"action_id": "nemoclaw-fix-blueprint", "description": "Add missing required fields to NemoClaw blueprint.yaml", "priority": "high"}),  # noqa: E501
+    ("nemoclaw_blueprint", "BLUEPRINT_INVALID_*", {"action_id": "nemoclaw-fix-blueprint-format", "description": "Fix invalid field format in NemoClaw blueprint.yaml", "priority": "high"}),  # noqa: E501
+    ("nemoclaw_blueprint", "BLUEPRINT_EMPTY_*", {"action_id": "nemoclaw-add-profile", "description": "Add at least one inference profile to NemoClaw blueprint", "priority": "high"}),  # noqa: E501
+    ("nemoclaw_blueprint", "BLUEPRINT_PROFILE_*", {"action_id": "nemoclaw-fix-profile", "description": "Add missing fields to NemoClaw inference profile", "priority": "medium"}),  # noqa: E501
+    ("nemoclaw_policy", "POLICY_MISSING_*", {"action_id": "nemoclaw-fix-policy-structure", "description": "Add missing required sections to OpenShell policy", "priority": "high"}),  # noqa: E501
+    ("nemoclaw_policy", "POLICY_WEAK_*", {"action_id": "nemoclaw-enforce-policy", "description": "Set enforcement mode to 'enforce' on all OpenShell endpoints", "priority": "high"}),  # noqa: E501
+    ("nemoclaw_policy", "POLICY_MISSING_TLS*", {"action_id": "nemoclaw-add-tls", "description": "Enable TLS termination on port 443 endpoints", "priority": "high"}),  # noqa: E501
+    ("nemoclaw_policy", "POLICY_WILDCARD_*", {"action_id": "nemoclaw-restrict-methods", "description": "Replace wildcard HTTP method rules with specific method constraints", "priority": "medium"}),  # noqa: E501
+    ("nemoclaw_policy", "POLICY_DANGEROUS_*", {"action_id": "nemoclaw-fix-filesystem", "description": "Remove dangerous writable paths from filesystem policy", "priority": "high"}),  # noqa: E501
+    ("*", "MISSING_EVIDENCE*", {"action_id": "missing-evidence-provide", "description": "Provide required evidence for this gate", "priority": "high"}),  # noqa: E501
+    ("*", "*", {"action_id": "generic-review-issue", "description": "Review and address the reported issue", "priority": "low"}),  # noqa: E501
 ]
 
 # Keyword patterns for extracting synthetic issue codes from plain text.

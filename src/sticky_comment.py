@@ -96,10 +96,7 @@ def _build_comment_body(results: list[dict], observe: bool) -> str:
         gate = r.get("gate_type", "unknown")
         passed = r.get("passed", False)
         if observe:
-            if passed:
-                status = "OBSERVE (PASS)"
-            else:
-                status = "OBSERVE (would FAIL)"
+            status = "OBSERVE (PASS)" if passed else "OBSERVE (would FAIL)"
             mode = "observe"
         else:
             status = "PASS" if passed else "FAIL"

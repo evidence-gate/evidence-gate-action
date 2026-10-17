@@ -82,7 +82,7 @@ jobs:
 | `gate_preset` | No | `""` | Named gate bundle (`web-app-baseline`, `enterprise-compliance`, `api-service`, `supply-chain`). Runs all gates in the preset |
 | `sticky_comment` | No | `false` | Aggregate results into a single updating PR comment. Requires `pull-requests: write` |
 | `debug` | No | `false` | Enable verbose diagnostic output |
-| `version` | No | `latest` | Evaluator version to install (e.g., `1.0.0`). `latest` uses stdlib-only evaluation |
+| `version` | No | `latest` | Deprecated (no-op). Kept for backward compatibility; the action always uses its bundled stdlib-only evaluator |
 | `dashboard_base_url` | No | `""` | Dashboard base URL for deep links |
 | `evidence_url` | No | `""` | Explicit evidence deep link URL |
 

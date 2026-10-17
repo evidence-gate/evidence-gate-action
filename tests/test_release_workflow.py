@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 # Locate release.yml relative to this test file
 _RELEASE_YML = Path(__file__).parent.parent / ".github" / "workflows" / "release.yml"
 

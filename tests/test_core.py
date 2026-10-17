@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
 import pytest
+from conftest import make_http_error, make_mock_response
 
 from core import (
     CORE_SHA256,
@@ -30,8 +31,6 @@ from core import (
     fail_closed_main,
     generate_run_id,
 )
-
-from conftest import make_http_error, make_mock_response
 
 # ---------------------------------------------------------------------------
 # Version metadata

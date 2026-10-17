@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Fail-closed in Free mode**: a gate with no evidence files, an empty evidence file (`{}`, `[]`, `null`), or an unknown `gate_type` now FAILS instead of silently passing.
+- `version` input no longer installs the unpublished `evidence-gate-evaluator` PyPI package (which made any non-`latest` value fail and was a dependency-confusion risk). The input is kept as a deprecated no-op.
+- `pyyaml` is pinned (`6.0.3`); `run:` steps no longer interpolate `${{ inputs.* }}` inline.
+- ruff clean.
+
 ## [1.0.0] - 2026-03-13
 
 ### Added

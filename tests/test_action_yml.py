@@ -5,8 +5,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
-
 ACTION_YML_PATH = Path(__file__).resolve().parent.parent / "action.yml"
 README_PATH = Path(__file__).resolve().parent.parent / "README.md"
 
@@ -98,18 +96,28 @@ class TestActionYml:
             f"version.required must be false, got {version_input['required']}"
         )
 
-    def test_cache_step_exists(self) -> None:
-        """action.yml must have a step using actions/cache for pip caching."""
+    def test_no_nonexistent_evaluator_package(self) -> None:
+        """action.yml must not install the unpublished evidence-gate-evaluator package."""
         raw = _load_raw()
-        assert "actions/cache@" in raw, (
-            "action.yml must contain an actions/cache step for pip caching"
-        )
+        assert "evidence-gate-evaluator" not in raw
+
+    def test_no_inline_input_expressions_in_run(self) -> None:
+        """run: lines must not interpolate ${{ inputs.* }} directly (script injection)."""
+        raw = _load_raw()
+        for line in raw.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("run:"):
+                assert "${{ inputs." not in stripped, stripped
+
+    def test_pyyaml_is_pinned(self) -> None:
+        raw = _load_raw()
+        assert re.search(r"pyyaml==\d+\.\d+\.\d+", raw)
 
     def test_pip_install_step_exists(self) -> None:
-        """action.yml must have a conditional pip install step."""
+        """action.yml must install its pinned runtime dependency (pyyaml)."""
         raw = _load_raw()
         assert "pip install" in raw, (
-            "action.yml must contain a 'pip install' step for version pinning"
+            "action.yml must contain a 'pip install' step for pyyaml"
         )
 
 
