@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-10-17
+
+Docs-only release; no change to evaluation behaviour.
+
+### Changed
+
+- README (EN/JA), `action.yml` description (Marketplace) and `docs/architecture.svg` now match the source: 35 gate types in total (26 generic, 5 Pro-only, 2 NemoClaw, `sbom`, `provenance`), 30 usable in Free mode, no evaluation limit in local mode. Removed the incorrect "25 gate types" and "100 evaluations/month" (Free) / "5,000+" (Pro) figures. Pro (hosted API) and Enterprise remain coming soon.
+- README usage examples reference `@v2`.
+- `RELEASING.md` describes the current `master` / `v2` release flow.
+
 ## [2.0.1] - 2026-10-17
 
 ### Changed
