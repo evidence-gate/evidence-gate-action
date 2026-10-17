@@ -16,7 +16,7 @@ This is a CI/CD quality gate enforcement tool -- not an AI code reviewer and not
 Add this step to any GitHub Actions workflow:
 
 ```yaml
-- uses: evidence-gate/evidence-gate-action@v1
+- uses: evidence-gate/evidence-gate-action@v2
   with:
     gate_type: "test_coverage"
     phase_id: "testing"
@@ -33,7 +33,7 @@ If the evidence is valid, the step passes. If the evidence is missing or invalid
 |---|---|---|
 | **API key** | Not required | `api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}` (not issued yet) |
 | **What runs** | Local validation (file existence, JSON schema, numeric thresholds) | Hosted evaluation with Blind Gates, evidence chains (L4), quality state |
-| **Evaluations/month** | 100 | 5,000+ |
+| **Gate types** | 30 of 35 (all except the 5 Pro-only types); no evaluation limit in local mode | All 35, including the 5 Pro-only types |
 | **Best for** | Open-source projects, basic evidence checks | Teams needing audit trails, compliance workflows, AI-driven pipelines |
 
 Enterprise uses the same action with a custom `api_base` for self-hosted deployment.
@@ -64,7 +64,7 @@ jobs:
       contents: read
       checks: write
     steps:
-      - uses: evidence-gate/evidence-gate-action@v1
+      - uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_type: "test_coverage"
           phase_id: "testing"
@@ -111,7 +111,7 @@ jobs:
 ```yaml
 - name: Evidence Gate
   id: gate
-  uses: evidence-gate/evidence-gate-action@v1
+  uses: evidence-gate/evidence-gate-action@v2
   with:
     gate_type: "test_coverage"
     phase_id: "testing"
@@ -153,7 +153,7 @@ jobs:
         run: pytest --cov --cov-report=json
 
       - name: Evidence Gate
-        uses: evidence-gate/evidence-gate-action@v1
+        uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_type: "test_coverage"
           phase_id: "testing"
@@ -179,7 +179,7 @@ jobs:
         run: bandit -r src/ -f json -o security-report.json || true
 
       - name: Evidence Gate
-        uses: evidence-gate/evidence-gate-action@v1
+        uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_type: "security"
           phase_id: "security-scan"
@@ -205,7 +205,7 @@ jobs:
         run: npm run build
 
       - name: Evidence Gate
-        uses: evidence-gate/evidence-gate-action@v1
+        uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_type: "build"
           phase_id: "build"
@@ -234,14 +234,14 @@ jobs:
         run: bandit -r src/ -f json -o security-report.json || true
 
       - name: Coverage Gate
-        uses: evidence-gate/evidence-gate-action@v1
+        uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_type: "test_coverage"
           phase_id: "testing"
           evidence_files: "coverage.json"
 
       - name: Security Gate
-        uses: evidence-gate/evidence-gate-action@v1
+        uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_type: "security"
           phase_id: "security"
@@ -269,7 +269,7 @@ jobs:
         run: pytest --cov --cov-report=json
 
       - name: Evidence Gate (Web App Baseline)
-        uses: evidence-gate/evidence-gate-action@v1
+        uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_preset: "web-app-baseline"
           phase_id: "quality-check"
@@ -298,7 +298,7 @@ jobs:
 
       - name: Evidence Gate (Observe)
         id: gate
-        uses: evidence-gate/evidence-gate-action@v1
+        uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_type: "test_coverage"
           phase_id: "testing"
@@ -333,7 +333,7 @@ jobs:
         run: pytest --cov --cov-report=json
 
       - name: Evidence Gate (Blind)
-        uses: evidence-gate/evidence-gate-action@v1
+        uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_type: "skill"
           phase_id: "quality-check"
@@ -363,7 +363,7 @@ jobs:
         run: pytest --cov --cov-report=json
 
       - name: Coverage Gate
-        uses: evidence-gate/evidence-gate-action@v1
+        uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_type: "test_coverage"
           phase_id: "testing"
@@ -371,7 +371,7 @@ jobs:
           sticky_comment: "true"
 
       - name: Build Gate
-        uses: evidence-gate/evidence-gate-action@v1
+        uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_type: "build"
           phase_id: "build"
@@ -405,7 +405,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pytest --cov --cov-report=json
-      - uses: evidence-gate/evidence-gate-action@v1
+      - uses: evidence-gate/evidence-gate-action@v2
 ```
 
 ### Validate SBOM and build provenance
@@ -423,7 +423,7 @@ jobs:
       checks: write
     steps:
       - uses: actions/checkout@v4
-      - uses: evidence-gate/evidence-gate-action@v1
+      - uses: evidence-gate/evidence-gate-action@v2
         with:
           gate_type: "sbom"
           phase_id: "release"
@@ -560,10 +560,9 @@ The hosted API (Pro) is coming soon. The Pro / Enterprise column describes plann
 
 | Feature | Free | Pro / Enterprise (coming soon) |
 |---------|:----:|:----------------:|
-| Gate evaluations/month | 100 | 5,000+ |
-| All 25 gate types | Yes | Yes |
-| SARIF output | Yes | Yes |
-| GitHub Check Runs | Yes | Yes |
+| Evaluation limit | None (local mode) | To be announced |
+| Gate types | 30 of 35 | All 35 |
+| Check Run annotations | Yes | Yes |
 | SHA-256 integrity hashing | Yes | Yes |
 | Fail-closed error handling | Yes | Yes |
 | `GITHUB_STEP_SUMMARY` | Yes | Yes |

@@ -1,5 +1,5 @@
 name: "Evidence Gate Action"
-description: "Fail-closed quality gates for CI/CD. 25 gate types, tamper-proof evidence chains, Blind Gate anti-gaming. Free for OSS."
+description: "Fail-closed quality gates for CI/CD. 35 gate types (30 in Free mode), no evaluation limit locally. Pro (hosted API, Blind Gate) coming soon."
 author: "evidence-gate"
 
 branding:
