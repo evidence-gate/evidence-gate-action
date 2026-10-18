@@ -2,9 +2,11 @@
 
 # Evidence Gate Action
 
-Fail-closed quality gates for GitHub Actions with verifiable evidence chains.
+Fail-closed quality gates for GitHub Actions. Free mode checks evidence files in CI.
 
-**AI writes your code and your tests. How do you prove quality to an auditor?** Evidence Gate evaluates pipeline artifacts against quality criteria, blocks merges that fail, and records every evaluation as tamper-proof evidence (L1 declarations through L4 SHA-256 hash chains). **Blind Gates** hide the pass/fail criteria, making it harder for AI agents to reverse-engineer or game them.
+**AI writes your code and your tests. How do you check the artifacts in CI?** Evidence Gate evaluates pipeline artifacts against quality criteria and blocks merges that fail. **Free mode (available now)** checks that evidence files exist, are valid JSON, and meet numeric thresholds, and records a SHA-256 digest of each file. That digest names the bytes that were checked. It is not signed, and it is not written to an external log.
+
+**Blind Gate, L4 hash chains, Pro, and the hosted API are coming soon** (準備中). `api.evidence-gate.dev` is not launched, and API keys are not issued. A planned L4 record is `sha256(previous + evidence_hash)` with no key and no signature. That construction is **tamper-evident**: modifying a single record is detectable when the rest of the chain is left intact. It does not prevent a full-chain rewrite by someone with write access to the store.
 
 This is a CI/CD quality gate enforcement tool -- not an AI code reviewer and not an AI agent guardrail. Multiple unrelated projects share the name "Evidence Gate" on GitHub -- this one enforces quality in your CI/CD pipeline.
 
@@ -32,17 +34,17 @@ If the evidence is valid, the step passes. If the evidence is missing or invalid
 | | Free (available now) | Pro / Enterprise (coming soon) |
 |---|---|---|
 | **API key** | Not required | `api_key: ${{ secrets.EVIDENCE_GATE_API_KEY }}` (not issued yet) |
-| **What runs** | Local validation (file existence, JSON schema, numeric thresholds) | Hosted evaluation with Blind Gates, evidence chains (L4), quality state |
+| **What runs** | Local validation (file existence, JSON validity, numeric thresholds) and a SHA-256 digest of each evidence file | Planned hosted evaluation: Blind Gates, a tamper-evident hash chain (L4), quality state |
 | **Gate types** | 30 of 35 (all except the 5 Pro-only types); no evaluation limit in local mode | All 35, including the 5 Pro-only types |
-| **Best for** | Open-source projects, basic evidence checks | Teams needing audit trails, compliance workflows, AI-driven pipelines |
+| **Best for** | Open-source projects, basic evidence-file checks | Planned, after the API launches, for teams that want hosted checks |
 
-Enterprise uses the same action with a custom `api_base` for self-hosted deployment.
+A custom `api_base` input exists for a future self-hosted deployment. Enterprise is not on sale, and the hosted API at the default URL is coming soon.
 
 ## When to Use This
 
-- **AI-assisted development** -- when LLMs generate both code and tests, traditional coverage metrics prove nothing; Blind Gates are a structural approach to this problem
-- **Audit & compliance** -- keep verifiable records of every quality gate decision (SOC 2, ISO 27001, EU AI Act, Japan AI guidelines)
-- **Deployment gating** -- block deployment unless quality evidence is present and valid
+- **AI-assisted development** -- when LLMs generate both code and tests, a coverage file can meet a number and still say little about quality. Free mode checks that the evidence file exists, is valid JSON, and meets a numeric threshold. Blind Gates (criteria kept outside the pipeline) are planned for the hosted API and are not available yet
+- **CI records** -- each run writes the pass/fail result and a SHA-256 digest of the evidence files to the Actions log and job summary
+- **Deployment gating** -- block deployment unless the evidence file is present and passes the local checks
 - **Multi-gate pipelines** -- run coverage, security, and build gates in sequence with a single action
 
 ## Permissions
@@ -79,7 +81,7 @@ jobs:
 | `phase_id` | No | `""` | Phase identifier (e.g., `build`, `test`, `deploy`). Optional if `.evidencegate.yml` is present |
 | `evidence_files` | No | `""` | Comma-separated list of evidence file paths |
 | `api_key` | No | `""` | Evidence Gate API key. Omit for Free mode. The hosted API (Pro) is coming soon; keys are not issued yet |
-| `api_base` | No | `https://api.evidence-gate.dev` | API base URL, used only when `api_key` is set. The hosted API at this default URL is coming soon (not yet available). Change for self-hosted Enterprise |
+| `api_base` | No | `https://api.evidence-gate.dev` | API base URL, used only when `api_key` is set. The hosted API at this default URL is coming soon (not launched). A custom URL is accepted; Enterprise is not on sale |
 | `mode` | No | `enforce` | `enforce` (fail on gate failure) or `observe` (log results without blocking) |
 | `gate_preset` | No | `""` | Named gate bundle (`web-app-baseline`, `enterprise-compliance`, `api-service`, `supply-chain`). Runs all gates in the preset |
 | `sticky_comment` | No | `false` | Aggregate results into a single updating PR comment. Requires `pull-requests: write` |
@@ -101,7 +103,7 @@ jobs:
 | `suggested_actions` | Human-readable repair steps for failed gates |
 | `retry_prompt` | Machine-readable repair instructions for AI agents. Empty string when gate passes |
 | `json_output` | Full evaluation result as JSON (use `fromJson()` to parse) |
-| `trace_url` | Trace URL (Pro/Enterprise) |
+| `trace_url` | Trace URL from a hosted evaluation response. Empty in Free mode. The hosted API (Pro) is coming soon |
 | `evidence_url` | Evidence detail URL |
 | `dashboard_url` | Dashboard URL |
 | `github_run_url` | GitHub Actions run URL |
@@ -311,9 +313,9 @@ jobs:
 
 ### Prevent AI agents from gaming your quality metrics
 
-> **Coming soon:** Blind Gates require the hosted API (Pro), which is not yet available. The example below shows the planned usage.
+> **Coming soon:** Blind Gates require the hosted API (Pro), which is not launched. The example below is planned usage. Setting `api_key` against the default host fails closed today. Free mode does not hide thresholds.
 
-Blind Gates keep evaluation criteria outside the pipeline -- the AI that generated the code cannot see or game the thresholds. The `skill` gate type is used here because skill evaluations are the primary use case for hidden criteria:
+Blind Gates, once that API exists, are meant to keep evaluation criteria outside the pipeline so the AI that generated the code does not read the thresholds from the workflow. The `skill` gate type is shown here because hidden criteria are the planned use case:
 
 ```yaml
 name: Blind Gate Evaluation
@@ -410,7 +412,7 @@ jobs:
 
 ### Validate SBOM and build provenance
 
-Verify supply chain security artifacts as part of your release pipeline:
+Free mode checks the shape of supply-chain files. It does not verify signatures, and it does not check that an SBOM matches the built artifact.
 
 ```yaml
 name: Supply Chain Gate
@@ -430,7 +432,7 @@ jobs:
           evidence_files: "sbom.cdx.json"
 ```
 
-Use `gate_type: "provenance"` for build provenance attestation. Both gate types are available in Free mode.
+Use `gate_type: "provenance"` to check that a provenance file is JSON with the expected in-toto fields. Both gate types are available in Free mode. See [BENCHMARKS.md](BENCHMARKS.md) for what a pass does and does not mean.
 
 ## Visual Proof
 
@@ -468,7 +470,7 @@ v1.1.0 is **backwards-compatible** for most users. Existing workflows continue t
 
 ### The one breaking change: API base URL
 
-If you use self-hosted Enterprise with a custom `api_base`, no action is needed -- your custom URL overrides the default.
+If you already set a custom `api_base`, no action is needed -- your URL overrides the default. Enterprise is not on sale.
 
 If you previously relied on the **default URL** `https://api.evidence-gate.com`, it has changed to `https://api.evidence-gate.dev`. Free users are unaffected -- the default URL change happens automatically. (The hosted API (Pro) is coming soon.)
 
@@ -507,15 +509,15 @@ evidence_files:
 | Gate presets | `gate_preset: web-app-baseline` | Runs 4 gates at once |
 | Sticky PR comment | `sticky_comment: true` | Single updating comment |
 | AI repair contract | output `retry_prompt` | Machine-readable fix instructions for AI agents |
-| SBOM gate | `gate_type: sbom` | CycloneDX/SPDX validation (Free) |
-| Provenance gate | `gate_type: provenance` | Build attestation check (Free) |
+| SBOM gate | `gate_type: sbom` | CycloneDX/SPDX structure (Free); does not check the SBOM matches the build |
+| Provenance gate | `gate_type: provenance` | in-toto field check (Free); signatures are not verified |
 | Check Run annotations | automatic | Findings appear inline in Files Changed tab |
 | Signal-sorted Job Summary | automatic | Critical > Warning > Info |
 
 ### Migration Checklist
 
 - [ ] Verify existing workflows still pass (most users: no action required)
-- [ ] If using self-hosted Enterprise: confirm `api_base` URL is still correct
+- [ ] If you set a custom `api_base`: confirm the URL is still correct. Enterprise is not on sale
 - [ ] Optional: add `.evidencegate.yml` to your repo for zero-input usage
 - [ ] Optional: add `mode: warn` to non-critical gates for gradual rollout
 - [ ] Optional: add `sticky_comment: true` to aggregate PR feedback
@@ -530,19 +532,19 @@ evidence_files:
 
 When AI agents (Copilot, Claude, Cursor) generate both production code and tests, traditional CI/CD gates lose their meaning. An LLM told to "achieve 80% coverage" will produce tests that hit exactly 80.1% -- a number that satisfies the metric but proves nothing about quality.
 
-Evidence Gate addresses this with three design choices:
+Evidence Gate's Free mode checks the evidence file that pipeline produced: the file is present, the JSON is valid, and numeric fields meet a threshold.
 
-1. **Blind Gates** -- evaluation criteria are hidden from the pipeline, making it harder for AI agents to reverse-engineer or optimize against them. This is a structural approach to the gate-gaming problem in AI-driven development.
+What exists today, and what is only planned:
 
-2. **Evidence Trust Levels** -- every evaluation is recorded at one of four trust levels:
+1. **Free-mode checks (available now)** -- file existence, JSON validity, and numeric thresholds, plus a SHA-256 digest of each evidence file. Blind Gates, which would keep evaluation criteria outside the pipeline, need the hosted API (Pro). That API is coming soon and is not available.
+
+2. **Evidence trust levels (planned model, not recorded by Free mode)**:
    - **L1** Declaration -- the pipeline claims something happened
    - **L2** Attestation -- a third party confirms the claim
-   - **L3** Verification -- the claim is independently reproducible
-   - **L4** Hash Chain -- SHA-256 chain that any auditor can independently verify
+   - **L3** Verification -- someone other than the author reproduces the claim
+   - **L4** Hash chain -- `sha256(previous + evidence_hash)`, with no key, signature, or external log. Modifying a single record is detectable when the rest of the chain is unchanged (tamper-evident). A full-chain rewrite by someone with write access is not prevented. An auditor cannot treat the chain alone as independent proof.
 
-3. **Fail-closed semantics** -- missing evidence, unreachable API, or evaluation errors mean FAIL, never a silent pass.
-
-The evidence model is designed with global regulatory frameworks in mind -- SOC 2, ISO 27001, the EU AI Act's transparency requirements, Japan's AI guidelines, and similar standards that increasingly demand verifiable records of how AI-generated code was validated. Evidence Gate does not yet cover every requirement of every framework, and regulations are still evolving. But the core architecture -- immutable evidence chains, independent verifiability, fail-closed semantics -- is built to grow with these standards.
+3. **Fail-closed semantics (available now)** -- missing evidence, an unreachable API, or an evaluation error means FAIL, never a silent pass.
 
 This is an open-source project under active development. We welcome feedback, contributions, and real-world use cases.
 
@@ -551,8 +553,8 @@ This is an open-source project under active development. We welcome feedback, co
 | Mode | Config | What It Does |
 |------|--------|-------------|
 | **Free** | No `api_key` | Client-side evaluation: file existence, JSON validation, schema checks, numeric thresholds |
-| **Pro** (coming soon) | `api_key` set | Full SaaS evaluation: Blind Gate, Quality State, evidence chains (L4), remediation. The hosted API is not yet available |
-| **Enterprise** (coming soon) | `api_key` + custom `api_base` | Self-hosted with the same Pro features in your own infrastructure. Not yet on sale |
+| **Pro** (coming soon) | `api_key` set | Planned hosted evaluation: Blind Gate, Quality State, tamper-evident hash chain (L4), remediation. The hosted API is not launched |
+| **Enterprise** (coming soon) | `api_key` + custom `api_base` | The action can send the same request to a custom `api_base`. Enterprise is not on sale |
 
 ## Free vs Pro
 
@@ -563,17 +565,19 @@ The hosted API (Pro) is coming soon. The Pro / Enterprise column describes plann
 | Evaluation limit | None (local mode) | To be announced |
 | Gate types | 30 of 35 | All 35 |
 | Check Run annotations | Yes | Yes |
-| SHA-256 integrity hashing | Yes | Yes |
+| SHA-256 digest of each evidence file | Yes | Yes |
 | Fail-closed error handling | Yes | Yes |
 | `GITHUB_STEP_SUMMARY` | Yes | Yes |
 | Observe mode | Yes | Yes |
 | Gate presets | Yes | Yes |
 | Sticky PR comments | Yes | Yes |
 | Structured outputs (missing_evidence, suggested_actions) | Yes | Yes |
-| Blind Gate evaluation | -- | Yes |
-| Evidence chain verification (L4) | -- | Yes |
-| Quality State tracking | -- | Yes |
-| Remediation workflows | -- | Yes |
+| Blind Gate evaluation | -- | Planned |
+| Tamper-evident hash chain (L4) | -- | Planned |
+| Quality State tracking | -- | Planned |
+| Remediation workflows | -- | Planned |
+
+L4, once the hosted API exists, links records as `sha256(previous + evidence_hash)`. There is no signing key and no external log. A single-record edit is detectable; rewriting the whole chain is not prevented. L4 is not available in this action today. The hosted API at `api.evidence-gate.dev` is coming soon (準備中).
 
 ## Troubleshooting
 
@@ -589,17 +593,20 @@ You are using a Pro-only gate type (`blind_gate`, `quality_state`, `remediation`
 
 ### API connection errors (Pro/Enterprise)
 
-The hosted API (Pro) at `https://api.evidence-gate.dev` is coming soon and is not yet available, so setting `api_key` without a self-hosted `api_base` will fail (fail-closed).
+The hosted API (Pro) at `https://api.evidence-gate.dev` is coming soon and is not launched. Setting `api_key` without a custom `api_base` fails closed, because that default host is not a working endpoint.
 
-1. **Check your API key**: Ensure `EVIDENCE_GATE_API_KEY` is set in repository secrets.
-2. **Verify the API base URL**: For Enterprise, confirm `api_base` is reachable from GitHub Actions runners.
+Enterprise is not on sale. If you point `api_base` at a server you run yourself:
 
-The action uses **fail-closed** semantics: any unhandled error exits non-zero. This prevents false passes when the evaluation service is unreachable.
+1. **API key**: `EVIDENCE_GATE_API_KEY` must be set in repository secrets for the client to send a request.
+2. **API base URL**: `api_base` must be reachable from GitHub Actions runners.
+
+The action uses **fail-closed** semantics: any unhandled error exits non-zero. An unreachable evaluation service does not pass the gate.
 
 ## Links
 
 - [Landing Page](https://evidence-gate.dev)
 - [Changelog](CHANGELOG.md)
+- [Security policy](SECURITY.md)
 
 ## License
 

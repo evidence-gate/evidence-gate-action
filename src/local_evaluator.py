@@ -4,7 +4,7 @@ Provides local evaluation without an API key. Supports:
 - File existence checks
 - JSON structure validation
 - Numeric threshold checks
-- SHA-256 integrity hashes
+- SHA-256 digests of evidence files (the bytes that were checked; not a signed chain)
 
 Pro-only gate types (blind_gate, quality_state, remediation, composite, wave)
 produce a warning-level "coming soon" notice instead of failure.
@@ -670,6 +670,8 @@ def evaluate_provenance(
     - _type key -> raw in-toto statement
 
     Performs structural validation of the in-toto statement.
+    Signatures, builder identity, and binding a digest to an artifact
+    are not checked.
 
     Returns:
         Result dict with keys: passed, mode, gate_type, phase_id, issues.

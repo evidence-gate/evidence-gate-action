@@ -4,9 +4,9 @@ Reads configuration from environment variables set by action.yml,
 runs evaluation, and exits non-zero on failure (fail-closed).
 
 Supports three modes:
-- Free: no API key -> local evaluation via local_evaluator
-- Pro: API key set -> SaaS API evaluation (hosted API coming soon)
-- Enterprise: API key + custom API base -> self-hosted evaluation
+- Free: no API key -> local checks (file existence, JSON validity, thresholds)
+- Pro: API key and the default API base -> hosted API (coming soon, not launched)
+- Enterprise: API key + custom API base -> request to that URL (not on sale)
 """
 
 from __future__ import annotations
