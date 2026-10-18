@@ -1,7 +1,7 @@
 """Gate preset bundles for Evidence Gate.
 
 Provides curated gate type bundles so users don't need to know
-which of the 22+ gate types to pick. Each preset is a named
+which of the 35 gate types to pick. Each preset is a named
 list of gate types that are evaluated sequentially.
 
 Uses only stdlib -- no third-party dependencies.

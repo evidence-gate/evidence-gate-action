@@ -1,5 +1,5 @@
 name: "Evidence Gate Action"
-description: "Fail-closed quality gates for CI/CD. 35 gate types (30 in Free mode), no evaluation limit locally. Pro (hosted API, Blind Gate) coming soon."
+description: "Fail-closed CI checks that evidence files exist, are valid JSON, and meet thresholds (30 of 35 gate types locally). Blind Gate and the hosted API (Pro) are coming soon."
 author: "evidence-gate"
 
 branding:
@@ -32,7 +32,7 @@ inputs:
     required: false
     default: ""
   api_base:
-    description: "Evidence Gate API base URL, used only when api_key is set. The hosted API (Pro) at the default URL is coming soon and not yet available; change for Self-hosted Enterprise"
+    description: "Evidence Gate API base URL, used only when api_key is set. The hosted API (Pro) at the default URL is coming soon and is not launched. A custom URL is accepted; Enterprise is not on sale"
     required: false
     default: "https://api.evidence-gate.dev"
   dashboard_base_url:
@@ -72,7 +72,7 @@ outputs:
     description: "Pipeline run ID"
     value: ${{ steps.evidence_gate.outputs.run_id }}
   trace_url:
-    description: "Langfuse trace URL"
+    description: "Trace URL from a hosted evaluation response. Empty in Free mode. The hosted API (Pro) is coming soon and is not launched."
     value: ${{ steps.evidence_gate.outputs.trace_url }}
   evidence_url:
     description: "Evidence detail URL"

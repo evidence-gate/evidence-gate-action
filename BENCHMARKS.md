@@ -33,6 +33,7 @@ Evidence Gate's Free mode performs structural validation -- it is a format and c
 
 1. A passing sbom gate tells you that a correctly-formatted SBOM exists; it does not tell you the SBOM is accurate.
 2. A passing provenance gate tells you that a structurally valid provenance file exists; it does not tell you the build was performed by a trusted builder.
+3. A SHA-256 value recorded for an evidence file is a digest of those bytes. It is not a signature, and it is not a hash chain. The planned L4 chain (`sha256(previous + evidence_hash)`) has no key and no external log: a single-record change is detectable (tamper-evident), and a full rewrite by someone with write access is not prevented. That chain is not part of Free mode. The hosted API (Pro) is coming soon and is not launched.
 
 Cryptographic verification, Sigstore integration, and semantic analysis are planned for the hosted API (Pro), which is coming soon.
 

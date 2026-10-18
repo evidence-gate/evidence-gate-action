@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Public text (README EN/JA, `action.yml` marketplace description, `docs/architecture.svg`, `BENCHMARKS.md`, and comments that described the evidence record) no longer calls the chain tamper-proof, tamperproof, tamper resistant, 改ざん不可能, or L4 改ざん不能. The accurate bound is tamper-evident: `sha256(previous + evidence_hash)` makes a single-record modification detectable, and does not prevent a full-chain rewrite by someone with write access (no key, signature, or external log).
+- Free mode is described as file existence, JSON validity, and numeric thresholds, plus a SHA-256 digest of each evidence file. Blind Gate, L4, Pro, and the hosted API at `api.evidence-gate.dev` are labeled coming soon / 準備中. Wording that presented the action as full-stack AI governance, or as an immutable auditor-verifiable chain (including SOC 2 / ISO 27001 / EU AI Act coverage), is removed.
+- Added `SECURITY.md`. Contact: support@evidence-gate.dev. Report vulnerabilities with GitHub private vulnerability reporting.
+
 ## [2.0.2] - 2026-10-17
 
 Docs-only release; no change to evaluation behaviour.
@@ -46,14 +52,15 @@ Docs-only release; no change to evaluation behaviour.
 ### Added
 
 - Initial release of Evidence Gate GitHub Action
-- Three operational modes: Free (client-side), Pro (SaaS), Enterprise (self-hosted)
-- Free mode: file existence, JSON validation, schema checks, numeric thresholds, SHA-256 integrity
-- Pro/Enterprise mode: Blind Gate, Quality State, Remediation, Composite gates, Wave evaluation
+- Client paths for three modes: Free (local checks), Pro (hosted API, not launched in this release), Enterprise (custom `api_base`, not on sale)
+- Free mode: file existence, JSON validation, schema checks, numeric thresholds, SHA-256 file digests
+- Pro/Enterprise client paths (hosted API was not launched): Blind Gate, Quality State, Remediation, Composite gates, Wave evaluation
 - `GITHUB_STEP_SUMMARY` output with detailed gate results
 - Workflow annotations (warnings for Pro-only gate types in Free mode)
 - Fail-closed error handling
 - Comprehensive input/output interface via `action.yml`
 
-[Unreleased]: https://github.com/evidence-gate/evidence-gate-action/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/evidence-gate/evidence-gate-action/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/evidence-gate/evidence-gate-action/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/evidence-gate/evidence-gate-action/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/evidence-gate/evidence-gate-action/compare/v1.1.0...v2.0.0

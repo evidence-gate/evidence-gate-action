@@ -106,6 +106,9 @@ def build_evidence_ref(file_path: str) -> dict[str, Any]:
 
     Returns dict compatible with EvidenceRef model schema:
       ref, path, sha256, exists, loaded_at, size_bytes (extra metadata).
+
+    ``sha256`` is a digest of the file bytes. It is not a signature and
+    not a hash-chain link.
     """
     abs_path = os.path.abspath(file_path)
     if not os.path.isfile(abs_path):
